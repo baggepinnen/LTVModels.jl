@@ -1,13 +1,7 @@
 if !isdefined(:AbstractModel)
     include(Pkg.dir("DifferentialDynamicProgramming","src","interfaces.jl"))
 end
-if !isdefined(:KalmanModel)
-    type KalmanModel{T} <: AbstractModel
-        A::Array{T,3}
-        B::Array{T,3}
-        P::Array{T,3}
-    end
-end
+
 
 # TODO: introduce directional forgetting!!
 function fit_model!(model::KalmanModel, x,u,xnew,R1,R2, extend=false)::KalmanModel
@@ -36,9 +30,9 @@ function fit_model!(model::KalmanModel, x,u,xnew,R1,R2, extend=false)::KalmanMod
         B[:,:,end] = B[:,:,end-1]
         Pkn = cat(3,Pkn, Pkn[:,:,end])
     end
-    model.A = A
-    model.B = B
-    model.P = Pkn
+    model.At = A
+    model.Bt = B
+    model.Pt = Pkn
     yhat = predict(model, x,u)
     fit = nrmse(xnew,yhat)
     println("Modelfit: ", round(fit,3))
@@ -50,46 +44,6 @@ function fit_model(::Type{KalmanModel}, args...)::KalmanModel
     model = KalmanModel(zeros(1,1,1),zeros(1,1,1),zeros(1,1,1))
     fit_model!(model, args...)
     model
-end
-
-function predict(model::KalmanModel, x, u)
-    T,n  = size(x)
-    xnew = zeros(T,n)
-    for t = 1:T
-        xnew[t,:] = (model.A[:,:,t] * x[t,:] + model.B[:,:,t] * u[t,:])'
-    end
-    xnew
-end
-
-function predict(model::KalmanModel, x, u, i)
-    xnew = model.A[:,:,i] * x + model.B[:,:,i] * u
-end
-
-# function predict(model::KalmanModel, batch::Batch)
-#
-# end
-
-
-function df(model::KalmanModel, x, u)
-    fx  = model.A
-    fu  = model.B
-    fxx = []
-    fxu = []
-    fuu = []
-    return fx,fu,fxx,fxu,fuu
-end
-
-plot_eigvals(model::KalmanModel) = scatter(hcat([eigvals(model.A[:,:,t]) for t=1:T]...)', title="Eigenvalues of dynamics matrix")
-
-function plot_coeffs!(model::KalmanModel; kwargs...)
-    n,T = size(model.A,1,3)
-    plot!(reshape(model.A,n^2,T)'; title="Coefficients of dynamics matrix", kwargs...)
-end
-
-function plot_coeffs(model::KalmanModel; kwargs...)
-    fig = plot()
-    plot_coeffs!(model; kwargs...)
-    fig
 end
 
 
@@ -145,15 +99,7 @@ function kalman_smoother(y, C, R1, R2, P0)
     return xkn, Pkn
 end
 
-function test_model_kalman()
-    function toOrthoNormal(Ti)
-        local T = deepcopy(Ti)
-        U_,S_,V_ = svd(T[1:3,1:3])
-        local R = U_*diagm([1,1,sign(det(U_*V_'))])*V_'
-        T[1:3,1:3] = R
-        return T
-    end
-
+function test_kalmanmodel()
     n           = 3
     m           = 2
     T           = 10000
@@ -173,15 +119,15 @@ function test_model_kalman()
         A[:,:,t+1] = A[:,:,t] + 0.001randn(n,n)
         B[:,:,t+1] = B[:,:,t] + 0.001randn(n,m)
     end
-    R1          = 0.00001*eye(N) # Increase for faster adaptation
+    R1          = 0.00001*eye(n^2+n*m) # Increase for faster adaptation
     R2          = 10*eye(n)
 
     model = fit_model(KalmanModel, x',u',xnew',R1,R2,true)
 
     normA  = [norm(A[:,:,t]) for t                = 1:T]
     normB  = [norm(B[:,:,t]) for t                = 1:T]
-    errorA = [norm(A[:,:,t]-model.A[:,:,t]) for t = 1:T]
-    errorB = [norm(B[:,:,t]-model.B[:,:,t]) for t = 1:T]
+    errorA = [norm(A[:,:,t]-model.At[:,:,t]) for t = 1:T]
+    errorB = [norm(B[:,:,t]-model.Bt[:,:,t]) for t = 1:T]
     plot([normA errorA normB errorB], lab=["normA" "errA" "normB" "errB"], show=true)#, yscale=:log10)
 
 end

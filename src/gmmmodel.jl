@@ -1,14 +1,9 @@
 if !isdefined(:AbstractModel)
     include(Pkg.dir("DifferentialDynamicProgramming","src","interfaces.jl"))
 end
-if !isdefined(:GMMModel)
-    include("gmmutils.jl")
-    type GMMModel <: AbstractModel
-        M
-        dynamics
-        T
-    end
-end
+
+include("gmmutils.jl")
+
 
 """
 `M, dynamics, ass, T = fit_model!(model::GMMModel, x, u, y, K [,d1])`
@@ -133,7 +128,7 @@ function df(model::GMMModel,x,u)
 end
 
 
-function test_model_gmm()
+function test_gmmmodel()
     function toOrthoNormal(Ti)
         local T = deepcopy(Ti)
         U_,S_,V_ = svd(T[1:3,1:3])

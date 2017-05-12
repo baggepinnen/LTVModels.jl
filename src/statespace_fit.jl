@@ -1,3 +1,4 @@
+export fit_statespace, fit_statespace_gd, fit_statespace_constrained
 
 function fit_statespace(x,u,lambda; normType = 2, D = 2, solver=:ECOS, kwargs...)
     y,A  = matrices(x,u)
@@ -24,20 +25,14 @@ function fit_statespace(x,u,lambda; normType = 2, D = 2, solver=:ECOS, kwargs...
     end
 
     At,Bt = ABfromk(k,n,m,T)
-    LTVModel(At,Bt)
+    SimpleLTVModel(At,Bt)
 end
-
-
-
-
 
 function Lcurve(fun, lambdas)
     errors = pmap(fun, lambdas)
     plot(lambdas, errors, xscale=:log10, m=(:cross,))
     errors, lambdas
 end
-
-
 
 function fit_statespace_gd(x,u,lambda, initializer::Symbol=:kalman ;kwargs...)
     y,A     = matrices(x,u)
@@ -50,11 +45,12 @@ function fit_statespace_gd(x,u,lambda, initializer::Symbol=:kalman ;kwargs...)
         k .+= 0.00001randn(size(k))
     else
         model = fit_model(KalmanModel, x[1:end-1,:],u[1:end-1,:],x[2:end,:],0.00001*eye(n^2+n*m),eye(n), false)
-        k = [flatten(model.A) flatten(model.B)]
+        k = [flatten(model.At) flatten(model.Bt)]
     end
     fit_statespace_gd(x,u,lambda, k; kwargs...)
 end
-function fit_statespace_gd(x,u,lambda, k; normType = 1, D = 2, step=0.001, iters=10000, decay_rate=0.999, momentum=0.9, reduction=0, adaptive=true, kwargs...)
+
+function fit_statespace_gd(x,u,lambda, k; normType = 1, D = 2, step=0.001, iters=10000, decay_rate=0.999, momentum=0.9, reduction=0, adaptive=true, extend=true, kwargs...)
     if reduction > 0
         decay_rate = decayfun(iters, reduction)
     end
@@ -74,13 +70,13 @@ function fit_statespace_gd(x,u,lambda, k; normType = 1, D = 2, step=0.001, iters
         end
         NK = length(k2)
         if normType == 1
-            loss += lambda/NK*sum( sqrt(sum(diff_fun(k2).^2, 2)) )
+            loss += lambda/NK*sum( sqrt.(sum(diff_fun(k2).^2, 2)) )
         else
             loss += lambda/NK*sum(diff_fun(k2).^2)
         end
         loss
     end
-    loss_tape   = ReverseDiff.GradientTape(lossfun, (k,))
+    loss_tape   = GradientTape(lossfun, (k,))
     inputs      = (k,)
     results     = (similar(k),)
     all_results = map(DiffBase.GradientResult, results)
@@ -90,7 +86,7 @@ function fit_statespace_gd(x,u,lambda, k; normType = 1, D = 2, step=0.001, iters
     steps       = zeros(iters)
     for iter = 1:iters
         steps[iter] = step
-        ReverseDiff.gradient!(all_results, loss_tape, inputs)
+        gradient!(all_results, loss_tape, inputs)
         mom .= step.*all_results[1].derivs[1] + momentum*mom
         k .-= mom
         costs[iter+1] = lossfun(k) #all_results[1].value
@@ -106,12 +102,12 @@ function fit_statespace_gd(x,u,lambda, k; normType = 1, D = 2, step=0.001, iters
     end
 
     At,Bt = ABfromk(k,n,m,T)
-    LTVModel(At,Bt),costs, steps
+    SimpleLTVModel(At,Bt,extend),costs, steps
 end
 
-function fit_statespace_constrained(x,u,changepoints::AbstractVector)
+function fit_statespace_constrained(x,u,changepoints::AbstractVector; extend=true)
     y,A           = matrices(x,u)
-    n             = size(x,2)
+    T,n             = size(x)
     m             = size(u,2)
     nc            = length(changepoints)
     changepointse = [1; changepoints; size(x,1)-1]
@@ -123,6 +119,56 @@ function fit_statespace_constrained(x,u,changepoints::AbstractVector)
         inds = ii:ii2
         k = (A[inds,:]\y[inds])'
     end
-    At,Bt = segments2full(k,bps,n,m,T)
-    return LTVModel(At,Bt)
+    At,Bt = segments2full(k,changepoints,n,m,T)
+    return SimpleLTVModel(At,Bt,extend)
+end
+
+
+
+
+# Tests ========================================================================
+
+# Iterative solver =============================================================
+function test_fit_statespace(lambda)
+    # Generate data
+    srand(1)
+    D        = 1
+    normType = 1
+    T_       = 400
+    n        = 2
+    At_      = [0.95 0.1; 0 0.95]
+    Bt_      = reshape([0.2; 1],2,1)
+    u        = randn(T_)
+    x        = zeros(T_,n)
+    for t = 1:T_-1
+        if t == 200
+            At_ = [0.5 0.05; 0 0.5]
+        end
+        x[t+1,:] = At_*x[t,:] + Bt_*u[t,:] + 0.2randn(n)
+    end
+    xm = x + 0.2randn(size(x));
+    model, cost, steps = fit_statespace_gd(xm,u,lambda, normType = normType, D = D, step=1e-4, momentum=0.992, iters=4000, reduction=0.1, adaptive=true, extend=true);
+    y = predict(model,x,u);
+    At,Bt = model.At,model.Bt
+    e = x[2:end,:] - y[1:end-1,:]
+    println("RMS error: ",rms(e)^2)
+
+    plot(flatten(At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
+    plot!([1,199], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
+    plot!([200,400], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
+    # # savetikz("figs/ss.tex", PyPlot.gcf())#, [" axis lines = middle,enlargelimits = true,"])
+    #
+    # plot(y, lab="Estimated state values", l=(:solid,), xlabel="Time index", ylabel="State value", grid=false, layout=2)
+    # plot!(x[2:end,:], lab="True state values", l=(:dash,))
+    # plot!(xm[2:end,:], lab="Measured state values", l=(:dot,))
+    # # savetikz("figs/states.tex", PyPlot.gcf())#, [" axis lines = middle,enlargelimits = true,"])
+
+    # plot([cost[1:end-1] steps], lab=["Cost" "Stepsize"],  xscale=:log10, yscale=:log10)
+
+
+    activation = segment(At,Bt)
+    changepoints = [findmax(activation)[2]]
+    fit_statespace_constrained(x,u,changepoints)
+
+    rms(e)
 end

@@ -11,6 +11,14 @@ function toeplitz{T}(c::Array{T},r::Array{T})
     A
 end
 
+function toOrthoNormal(Ti)
+    local T = deepcopy(Ti)
+    U_,S_,V_ = svd(T[1:3,1:3])
+    local R = U_*diagm([1,1,sign(det(U_*V_'))])*V_'
+    T[1:3,1:3] = R
+    return T
+end
+
 function getD(D,T)
     if D == 3
         return sparse(toeplitz([-1; zeros(T-4)],[-1 3 -3 1 zeros(1,T-4)]))
@@ -57,25 +65,17 @@ function segments2full(parameters,breakpoints,n,m,T)
     i = 1
     for t = 1:T
         i ∈ breakpoints && (i+=1)
-        At[:,:,t] = reshape(a[i][1:n^2],n,n)'
-        Bt[:,:,t] = reshape(a[i][n^2+1:end],n,m)'
+        At[:,:,t] = reshape(parameters[i][1:n^2],n,n)'
+        Bt[:,:,t] = reshape(parameters[i][n^2+1:end],n,m)'
     end
     At,Bt
 end
 
-predict(x,u,model::LTVModel) = predict(x,u,model.At,model.Bt)
-function predict(x,u,At,Bt)
-    n,T = size(At,2,3)
-    y   = zeros(T,n)
-    for i = 1:T
-        y[i,:] = At[:,:,i]*x[i,:] + Bt[:,:,i]*u[i,:]
-    end
-    y
-end
+
 
 
 segment(res) = segment(res...)
-segment(model:::LTVModel) = segment(model.At,model.Bt)
+segment(model::LTVStateSpaceModel) = segment(model.At,model.Bt)
 function segment(At,Bt, args...)
     diffparams = (diff([flatten(At) flatten(Bt)],1)).^2
     # diffparams .-= minimum(diffparams,1)

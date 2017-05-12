@@ -1,3 +1,5 @@
+export fit_statespace_dp
+
 # Piecewise constant segmentation ==============================================
 @inline function argmin_const(y,w,t1,t2)
     # y'w/sum(w) weighted mean of y
@@ -98,12 +100,75 @@ end
 
 
 
-function fit_statespace_dp(x,u, M; kwargs...)
+function fit_statespace_dp(x,u, M; extend=true, kwargs...)
     T,n = size(x)
     m = size(u,2)
     input = matrices(x,u)
     V,bps,a = seg_bellman(input,M, ones(T-1), cost_ss, argmin_ss, doplot=false)
     At,Bt = segments2full(a,bps,n,m,T)
 
-    LTVModel(At, Bt)
+    SimpleLTVModel(At, Bt,extend)
 end
+
+
+
+# Tests
+# Dynamic programming ==========================================================
+function benchmark_const(N, M=1)
+    n = 3N
+    y = [0.1randn(N); 10+0.1randn(N); 20+0.1randn(N)+linspace(1,10,N)]
+    V,t,a = @time seg_bellman(y,M, ones(y))
+    tplot = [1;t;n];
+    aplot = [a;a[end]];
+    plot(y)
+    plot!(tplot, aplot, l=:step);gui()
+    # yhat, x, a, b
+end
+
+function benchmark_ss(T_, M, doplot=false)
+    srand(1)
+    # M        = 1
+    # T_       = 400
+    n,m      = 2,1
+    At_      = [0.95 0.1; 0 0.95]
+    Bt_      = reshape([0.2; 1],2,1)
+    u        = randn(T_)
+    x        = zeros(T_,n)
+    for t = 1:T_-1
+        if t == T_÷2
+            At_ = [0.5 0.05; 0 0.5]
+        end
+        x[t+1,:] = At_*x[t,:] + Bt_*u[t,:] + 0.2randn(n)
+    end
+    xm = x + 0.2randn(size(x));
+    input = matrices(xm,u)
+    V,t,a = seg_bellman(input,M, ones(T_-1), cost_ss, argmin_ss, doplot=false)
+    if doplot
+        k = hcat(a...)'
+        At = reshape(k[:,1:n^2]',n,n,M+1)
+        Bt = reshape(k[:,n^2+1:end]',m,n,M+1)
+        At = permutedims(At, [2,1,3])
+        Bt = permutedims(Bt, [2,1,3])
+        tplot = [1;t;T_];
+        plot()
+        for i = 1:M+1
+            plot!(tplot[i:i+1],flatten(At)[i,:]'.*ones(2), c=[:blue :green :red :magenta], xlabel="Time index", ylabel="Model coefficients")
+        end
+        plot!([1,199], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
+        plot!([200,400], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
+    end
+    V,t,a
+end
+# T_vec = round(Int,logspace(2, 4,10))
+# times = map(T_vec) do T
+#     println(T)
+#     benchmark_ss(T, 1)
+# end
+# plot(T_vec, times)
+#
+# M_vec = [2,4,8,16,32]
+# times = map(M_vec) do M
+#     println(M)
+#     @elapsed benchmark_ss(110, M)
+# end
+# plot(M_vec, times)
