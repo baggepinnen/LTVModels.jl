@@ -4,7 +4,8 @@ end
 
 
 # TODO: introduce directional forgetting!!
-function fit_model!(model::KalmanModel, x,u,xnew,R1,R2, extend=false)::KalmanModel
+# TODO: predict with covariacne (filter). This should include both model covariacne and state covariance for kalman models
+function fit_model!(model::KalmanModel, x,u,xnew,R1,R2; extend=false)::KalmanModel
     T,n         = size(x)
     Ta          = extend ? T+1 : T
     m           = size(u,2)
@@ -40,11 +41,7 @@ function fit_model!(model::KalmanModel, x,u,xnew,R1,R2, extend=false)::KalmanMod
     return model
 end
 
-function fit_model(::Type{KalmanModel}, args...)::KalmanModel
-    model = KalmanModel(zeros(1,1,1),zeros(1,1,1),zeros(1,1,1))
-    fit_model!(model, args...)
-    model
-end
+
 
 
 function forward_kalman(y,C,R1,R2, P0)
@@ -122,7 +119,7 @@ function test_kalmanmodel()
     R1          = 0.00001*eye(n^2+n*m) # Increase for faster adaptation
     R2          = 10*eye(n)
 
-    model = fit_model(KalmanModel, x',u',xnew',R1,R2,true)
+    model = fit_model(KalmanModel, x',u',xnew',R1,R2,extend=true)
 
     normA  = [norm(A[:,:,t]) for t                = 1:T]
     normB  = [norm(B[:,:,t]) for t                = 1:T]

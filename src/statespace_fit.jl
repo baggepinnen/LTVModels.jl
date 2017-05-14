@@ -34,7 +34,7 @@ function Lcurve(fun, lambdas)
     errors, lambdas
 end
 
-function fit_statespace_gd(x,u,lambda, initializer::Symbol=:kalman ;kwargs...)
+function fit_statespace_gd(x,u,lambda, initializer::Symbol=:kalman ; extend=false,kwargs...)
     y,A     = matrices(x,u)
     T,n     = size(x)
     m       = size(u,2)
@@ -44,10 +44,10 @@ function fit_statespace_gd(x,u,lambda, initializer::Symbol=:kalman ;kwargs...)
         k = repmat(k',T,1)
         k .+= 0.00001randn(size(k))
     else
-        model = fit_model(KalmanModel, x[1:end-1,:],u[1:end-1,:],x[2:end,:],0.00001*eye(n^2+n*m),eye(n), false)
+        model = fit_model(KalmanModel, x[1:end-1,:],u[1:end-1,:],x[2:end,:],0.00001*eye(n^2+n*m),eye(n), extend=extend)
         k = [flatten(model.At) flatten(model.Bt)]
     end
-    fit_statespace_gd(x,u,lambda, k; kwargs...)
+    fit_statespace_gd(x,u,lambda, k; extend=extend, kwargs...)
 end
 
 function fit_statespace_gd(x,u,lambda, k; normType = 1, D = 2, step=0.001, iters=10000, decay_rate=0.999, momentum=0.9, reduction=0, adaptive=true, extend=true, kwargs...)
