@@ -1,4 +1,6 @@
 import Base.length
+export plot_coeffs,plot_coeffs!,plot_eigvals
+
 
 length(m::LTVStateSpaceModel) = size(m.At,3)
 
@@ -18,10 +20,10 @@ function predict(model::LTVStateSpaceModel, x, u, i)
 end
 
 function simulate(model::LTVStateSpaceModel, x0, u)
-    T,m  = size(u)
+    T = size(u,1)
     n = size(model.At,1)
     @assert T<=length(model) "Can not simulate further than the number of time steps in the model"
-    x = zeros(eltype(x),T,n)
+    x = zeros(eltype(u),T,n)
     x[1,:] = x0
     for t = 1:T-1
         x[t+1,:] = (model.At[:,:,t] * x[t,:] + model.Bt[:,:,t] * u[t,:])'
@@ -38,7 +40,13 @@ function df(model::LTVStateSpaceModel, x, u)
     return fx,fu,fxx,fxu,fuu
 end
 
-plot_eigvals(model::LTVStateSpaceModel) = scatter(hcat([eigvals(model.At[:,:,t]) for t=1:T]...)', title="Eigenvalues of dynamics matrix")
+function plot_eigvals(model::LTVModels.LTVStateSpaceModel, plot_circle=true)
+    scatter(hcat([eigvals(model.At[:,:,t]) for t=1:length(model)]...)', title="Eigenvalues of dynamics matrix")
+    if plot_circle
+        ϕ = linspace(0,2π,100)
+        plot!(cos.(ϕ),sin.(ϕ), l=(:black,1))
+    end
+end
 
 function plot_coeffs!(model::LTVStateSpaceModel; kwargs...)
     n,T = size(model.At,1,3)

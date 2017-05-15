@@ -1,4 +1,4 @@
-
+export toeplitz, toOrthoNormal, flatten, segment, segmentplot
 function toeplitz{T}(c::Array{T},r::Array{T})
     nc = length(c)
     nr = length(r)

@@ -50,7 +50,7 @@ function fit_statespace_gd(x,u,lambda, initializer::Symbol=:kalman ; extend=fals
     fit_statespace_gd(x,u,lambda, k; extend=extend, kwargs...)
 end
 
-function fit_statespace_gd(x,u,lambda, k; normType = 1, D = 2, step=0.001, iters=10000, decay_rate=0.999, momentum=0.9, reduction=0, adaptive=true, extend=true, kwargs...)
+function fit_statespace_gd(x,u,lambda, k; normType = 1, D = 1, step=0.001, iters=10000, decay_rate=0.999, momentum=0.9, print_period = 100, reduction=0, adaptive=true, extend=true, kwargs...)
     if reduction > 0
         decay_rate = decayfun(iters, reduction)
     end
@@ -90,7 +90,7 @@ function fit_statespace_gd(x,u,lambda, k; normType = 1, D = 2, step=0.001, iters
         mom .= step.*all_results[1].derivs[1] + momentum*mom
         k .-= mom
         costs[iter+1] = lossfun(k) #all_results[1].value
-        iter % 100 == 0 && println("Iteration: ", iter, " cost: ", round(costs[iter],6), " stepsize: ", step)
+        iter % print_period == 0 && println("Iteration: ", iter, " cost: ", round(costs[iter],6), " stepsize: ", step)
         if costs[iter+1] <= bestcost
             # bestk .= k
             bestcost = costs[iter+1]
@@ -169,6 +169,17 @@ function test_fit_statespace(lambda)
     activation = segment(At,Bt)
     changepoints = [findmax(activation)[2]]
     fit_statespace_constrained(x,u,changepoints)
+
+
+    model2, cost2, steps2 = fit_statespace_gd(xm,u,10lambda, normType = 2, D = D, step=0.01, momentum=0.992, iters=4000, reduction=0.1, adaptive=true, extend=true);
+    y2 = predict(model2,x,u);
+    At2,Bt2 = model2.At,model2.Bt
+    e2 = x[2:end,:] - y2[1:end-1,:]
+    println("RMS error: ",rms(e2)^2)
+
+    plot(flatten(At2), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
+    plot!([1,199], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
+    plot!([200,400], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
 
     rms(e)
 end
