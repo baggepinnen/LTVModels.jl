@@ -44,7 +44,7 @@ function fit_statespace_gd(x,u,lambda, initializer::Symbol=:kalman ; extend=fals
         k = repmat(k',T,1)
         k .+= 0.00001randn(size(k))
     else
-        model = fit_model(KalmanModel, x[1:end-1,:],u[1:end-1,:],x[2:end,:],0.00001*eye(n^2+n*m),eye(n), extend=extend)
+        model = fit_model(KalmanModel, x[1:end-1,:],u[1:end-1,:],x[2:end,:],0.00001*eye(n^2+n*m),eye(n), extend=false)
         k = [flatten(model.At) flatten(model.Bt)]
     end
     fit_statespace_gd(x,u,lambda, k; extend=extend, kwargs...)
