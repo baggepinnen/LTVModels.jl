@@ -1,4 +1,13 @@
-export toeplitz, toOrthoNormal, flatten, segment, segmentplot
+export toeplitz, toOrthoNormal, flatten, segment, segmentplot, rms, modelfit
+
+rms(x::AbstractVector) = sqrt(mean(x.^2))
+sse(x::AbstractVector) = x⋅x
+
+rms(x::AbstractMatrix) = sqrt.(mean(x.^2,1))[:]
+sse(x::AbstractMatrix) = sum(x.^2,1)[:]
+modelfit(y,yh) = 100 * (1-rms(y.-yh)./rms(y.-mean(y)))
+aic(x::AbstractVector,d) = log(sse(x)) + 2d/size(x,1)
+
 function toeplitz{T}(c::Array{T},r::Array{T})
     nc = length(c)
     nr = length(r)
