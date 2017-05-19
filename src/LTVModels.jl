@@ -3,7 +3,7 @@ module LTVModels
 
 export predict, simulate, fit_model
 
-using DSP, Plots
+using DSP, Plots, Convex, FirstOrderSolvers
 
 using ReverseDiff: GradientTape, GradientConfig,GradientResult, gradient!
 import DiffBase

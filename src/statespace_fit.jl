@@ -20,11 +20,13 @@ function fit_statespace(x,u,lambda; normType = 2, D = 2, solver=:ECOS, kwargs...
     problem = Convex.minimize(loss)
     if solver == :ECOS
         Convex.solve!(problem, ECOS.ECOSSolver(maxit=100, feastol=1e-10, feastol_inacc=1e-5, reltol=1e-09, abstol=1e-09, nitref=50))
+    elseif solver == :Mattias
+        Convex.solve!(problem, FirstOrderSolvers.LongstepWrapper(FirstOrderSolvers.GAPA(),max_iters=5000))
     else
         Convex.solve!(problem, SCS.SCSSolver(max_iters=100000, normalize=0, eps=1e-8))
     end
 
-    At,Bt = ABfromk(k,n,m,T)
+    At,Bt = ABfromk(k.value,n,m,T)
     SimpleLTVModel(At,Bt)
 end
 
