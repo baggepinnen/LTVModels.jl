@@ -10,8 +10,6 @@ function fit_model!(model::KalmanModel, x,u,xnew,R1,R2; extend=false)::KalmanMod
     Ta          = extend ? T+1 : T
     m           = size(u,2)
     N           = n^2+n*m
-    # R1          = 0.00001*eye(N) # Increase for faster adaptation
-    # R2          = 10*eye(n)
     P0          = R1 # Increase for faster initial adaptation
     y           = xnew'
     C           = zeros(n,N,T)
@@ -19,8 +17,8 @@ function fit_model!(model::KalmanModel, x,u,xnew,R1,R2; extend=false)::KalmanMod
         C[:,:,t] = kron(eye(n),[x[t,:]; u[t,:]]')
     end
     xkn, Pkn    = kalman_smoother(y, C, R1, R2, P0)
-    A           = Array{Float64}(n,n,Ta)
-    B           = Array{Float64}(n,m,Ta)
+    A           = Array{eltype(x)}(n,n,Ta)
+    B           = Array{eltype(x)}(n,m,Ta)
     for t = 1:T
         ABt      = reshape(xkn[:,t],n+m,n)'
         A[:,:,t] = ABt[:,1:n]
@@ -40,8 +38,6 @@ function fit_model!(model::KalmanModel, x,u,xnew,R1,R2; extend=false)::KalmanMod
 
     return model
 end
-
-
 
 
 function forward_kalman(y,C,R1,R2, P0)
