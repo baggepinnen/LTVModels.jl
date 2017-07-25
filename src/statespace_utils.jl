@@ -5,11 +5,11 @@ export plot_coeffs,plot_coeffs!,plot_eigvals
 length(m::LTVStateSpaceModel) = size(m.At,3)
 
 function predict(model::LTVStateSpaceModel, x, u)
-    T,n  = size(x)
+    n,T  = size(x)
     @assert T<=length(model) "Can not predict further than the number of time steps in the model"
-    xnew = zeros(eltype(x),T,n)
-    for t = 1:T
-        xnew[t,:] = (model.At[:,:,t] * x[t,:] + model.Bt[:,:,t] * u[t,:])'
+    xnew = Array{eltype(x)}(n,T)
+    @views for t = 1:T
+        xnew[:,t] = (model.At[:,:,t] * x[:,t] + model.Bt[:,:,t] * u[:,t])'
     end
     xnew
 end
@@ -20,13 +20,14 @@ function predict(model::LTVStateSpaceModel, x, u, i)
 end
 
 function simulate(model::LTVStateSpaceModel, x0, u)
-    T = size(u,1)
+    T = size(u,2)
     n = size(model.At,1)
+    @assert T > n "The calling convention for u is that time is the second dimention (n,T = size(u))"
     @assert T<=length(model) "Can not simulate further than the number of time steps in the model"
-    x = zeros(eltype(u),T,n)
-    x[1,:] = x0
-    for t = 1:T-1
-        x[t+1,:] = (model.At[:,:,t] * x[t,:] + model.Bt[:,:,t] * u[t,:])'
+    x = Array{eltype(u)}(n,T)
+    x[:,1] = x0
+    @views for t = 1:T-1
+        x[:,t+1] = model.At[:,:,t] * x[:,t] + model.Bt[:,:,t] * u[:,t]
     end
     x
 end

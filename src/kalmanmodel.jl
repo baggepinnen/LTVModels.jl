@@ -5,39 +5,65 @@ end
 
 # TODO: introduce directional forgetting!!
 # TODO: predict with covariacne (filter). This should include both model covariacne and state covariance for kalman models
-function fit_model!(model::KalmanModel, x,u,xnew,R1,R2; extend=false)::KalmanModel
-    T,n         = size(x)
-    Ta          = extend ? T+1 : T
-    m           = size(u,2)
-    N           = n^2+n*m
-    P0          = R1 # Increase for faster initial adaptation
-    y           = xnew'
-    C           = zeros(n,N,T)
-    for t = 1:T
-        C[:,:,t] = kron(eye(n),[x[t,:]; u[t,:]]')
+
+function fit_model!(model::KalmanModel, x,u,xnew,R1,R2, P0=R1; extend=false, printfit=true)::KalmanModel
+    n,T = size(x)
+    @assert T > n "The calling convention for x and u is that time is the second dimention"
+    Ta  = extend ? T+1 : T
+    m   = size(u,1)
+    N   = n^2+n*m
+    y   = copy(xnew)
+    C   = zeros(n,N,T)
+    @views for t = 1:T
+        C[:,:,t] = kron(eye(n),[x[:,t]; u[:,t]]')
     end
     xkn, Pkn    = kalman_smoother(y, C, R1, R2, P0)
-    A           = Array{eltype(x)}(n,n,Ta)
-    B           = Array{eltype(x)}(n,m,Ta)
-    for t = 1:T
+    @views for t = 1:T
         ABt      = reshape(xkn[:,t],n+m,n)'
-        A[:,:,t] = ABt[:,1:n]
-        B[:,:,t] = ABt[:,n+1:end]
+        model.At[:,:,t] .= ABt[:,1:n]
+        model.Bt[:,:,t] .= ABt[:,n+1:end]
     end
-    if extend
-        A[:,:,end] = A[:,:,end-1]
-        B[:,:,end] = B[:,:,end-1]
+    @views if extend # Extend model one extra time step (primitive way)
+        model.At[:,:,end] .= model.At[:,:,end-1]
+        model.Bt[:,:,end] .= model.Bt[:,:,end-1]
         Pkn = cat(3,Pkn, Pkn[:,:,end])
     end
-    model.At = A
-    model.Bt = B
     model.Pt = Pkn
-    yhat = predict(model, x,u)
-    fit = nrmse(xnew,yhat)
-    println("Modelfit: ", round(fit,3))
+    if printfit
+        yhat = predict(model, x,u)
+        fit = nrmse(xnew,yhat)
+        println("Modelfit: ", round.(fit,3))
+    end
 
     return model
 end
+
+function fit_model!(model::KalmanModel, prior::KalmanModel, args...; printfit = true, kwargs...)::KalmanModel
+    model = fit_model!(model, args...; printfit = false, kwargs...) # Fit model in the standard way without prior
+    n,m,T = size(model.Bt)
+    # @views state(model,t) = [vec(model.At[:,:,t]);  vec(model.Bt[:,:,t])][:]
+    # @views state(model,t) = [model.At[:,:,t]  model.Bt[:,:,t]] |> vec
+    @views state(model,t) = [model.At[:,:,t]  model.Bt[:,:,t]]' |> vec
+    @views for t = 1:T     # Incorporate prior
+        Pkk = model.Pt[:,:,t]
+        K̄ = Pkk/(Pkk + prior.Pt[:,:,t])
+        model.Pt[:,:,t] .-= K̄*Pkk
+        x = state(model,t)
+        xp = state(prior,t)
+        x .+= K̄*(xp-x)
+        ABt      = reshape(x,n+m,n)'
+        model.At[:,:,t] .= ABt[:,1:n]
+        model.Bt[:,:,t] .= ABt[:,n+1:end]
+
+    end
+    if printfit
+        # yhat = predict(model, x,u)
+        # fit = nrmse(xnew,yhat)
+        # println("Modelfit: ", round(fit,3))
+    end
+    model
+end
+
 
 
 function forward_kalman(y,C,R1,R2, P0)
@@ -53,9 +79,9 @@ function forward_kalman(y,C,R1,R2, P0)
         size(C[i+1,ran,:]'), size(y[i+1,:])
         xkk[ran,1]    = C[i+1,ran,:]'\y[i+1,:]  # Initialize to global ls solution
     end
-    Pkk[:,:,1]  = P0;
-    xk         = xkk
-    Pk         = Pkk
+    Pkk[:,:,1]  = P0
+    xk         = copy(xkk)
+    Pk         = copy(Pkk)
     i          = 1
     Ck         = C[:,:,i]
     e          = y[:,i]-Ck*xk[:,i]
@@ -63,7 +89,7 @@ function forward_kalman(y,C,R1,R2, P0)
     K          = (Pk[:,:,i]*Ck')/S
     xkk[:,i]   = xk[:,i] + K*e
     Pkk[:,:,i] = (I - K*Ck)*Pk[:,:,i]
-    for i = 2:T
+    @views for i = 2:T
         Ak         = 1
         Ck         = C[:,:,i]
         xk[:,i]    = Ak*xkk[:,i-1]
@@ -84,7 +110,7 @@ function kalman_smoother(y, C, R1, R2, P0)
     Pkn           = similar(Pkk)
     xkn[:,end]    = xkk[:,end]
     Pkn[:,:,end]  = Pkk[:,:,end]
-    for i = T-1:-1:1
+    @views for i = T-1:-1:1
         Ck          = Pkk[:,:,i]/Pk[:,:,i+1]
         xkn[:,i]    = xkk[:,i] + Ck*(xkn[:,i+1] - xk[:,i+1])
         Pkn[:,:,i]  = Pkk[:,:,i] + Ck*(Pkn[:,:,i+1] - Pk[:,:,i+1])*Ck'
@@ -101,7 +127,7 @@ function test_kalmanmodel()
     x           = zeros(n,T)
     xnew        = zeros(n,T)
     u           = randn(m,T)
-    U,S,V       = toOrthoNormal(randn(n,n)), diagm(0.5rand(n)), toOrthoNormal(randn(n,n))
+    U,S,V       = toOrthoNormal(randn(n,n)), diagm(0.4rand(n)), toOrthoNormal(randn(n,n))
     A[:,:,1]    = U*S*V'
     B[:,:,1]    = 0.5randn(n,m)
     x[:,1]      = 0.1randn(n)
@@ -114,13 +140,29 @@ function test_kalmanmodel()
     end
     R1          = 0.00001*eye(n^2+n*m) # Increase for faster adaptation
     R2          = 10*eye(n)
-
-    model = fit_model(KalmanModel, x',u',xnew',R1,R2,extend=true)
+    P0          = 10000R1
+    @time model = fit_model(KalmanModel, copy(x),copy(u),copy(xnew),R1,R2,P0,extend=true)
 
     normA  = [norm(A[:,:,t]) for t                = 1:T]
     normB  = [norm(B[:,:,t]) for t                = 1:T]
     errorA = [norm(A[:,:,t]-model.At[:,:,t]) for t = 1:T]
     errorB = [norm(B[:,:,t]-model.Bt[:,:,t]) for t = 1:T]
+
+    @test sum(normA) > 1.8sum(errorA)
+    @test sum(normB) > 10sum(errorB)
     plot([normA errorA normB errorB], lab=["normA" "errA" "normB" "errB"], show=true)#, yscale=:log10)
 
+    N = n*(n+m)
+    P = zeros(N,N,T)
+    for i=1:T
+        P[:,:,i] .= 0.01eye(N)
+    end
+    prior = KalmanModel(A,B,P) # Use ground truth as prior
+    @time model = fit_model!(model, prior, copy(x),copy(u),copy(xnew),R1,R2,P0,extend=true)
+    errorAp = [norm(A[:,:,t]-model.At[:,:,t]) for t = 1:T]
+    errorBp = [norm(B[:,:,t]-model.Bt[:,:,t]) for t = 1:T]
+    plot([normA errorA errorAp normB errorB errorBp], lab=["normA" "errA" "errAp" "normB" "errB" "errBp"], show=true)
+
+    @test all(errorAp .<= errorA) # We expect this since ground truth was used as prior
+    @test all(errorBp .<= errorB)
 end

@@ -3,10 +3,10 @@ export toeplitz, toOrthoNormal, flatten, segment, segmentplot, rms, modelfit
 rms(x::AbstractVector) = sqrt(mean(x.^2))
 sse(x::AbstractVector) = x⋅x
 
-rms(x::AbstractMatrix) = sqrt.(mean(x.^2,1))[:]
-sse(x::AbstractMatrix) = sum(x.^2,1)[:]
+rms(x::AbstractMatrix) = sqrt.(mean(x.^2,2))[:]
+sse(x::AbstractMatrix) = sum(x.^2,2)[:]
 modelfit(y,yh) = 100 * (1-rms(y.-yh)./rms(y.-mean(y)))
-aic(x::AbstractVector,d) = log(sse(x)) + 2d/size(x,1)
+aic(x::AbstractVector,d) = log(sse(x)) + 2d/size(x,2)
 
 function toeplitz{T}(c::Array{T},r::Array{T})
     nc = length(c)
@@ -40,18 +40,18 @@ function getD(D,T)
 end
 
 function matrices(x,u)
-    T,n = size(x)
+    n,T = size(x)
     T -= 1
-    m = size(u,2)
+    m = size(u,1)
     A = spzeros(T*n, n^2+n*m)
     y = zeros(T*n)
     I = speye(n)
     for i = 1:T
         ii = (i-1)*n+1
         ii2 = ii+n-1
-        A[ii:ii2,1:n^2] = kron(I,x[i,:]')
-        A[ii:ii2,n^2+1:end] = kron(I,u[i,:]')
-        y[ii:ii2] = (x[i+1,:])
+        A[ii:ii2,1:n^2] = kron(I,x[:,i]')
+        A[ii:ii2,n^2+1:end] = kron(I,u[:,i]')
+        y[ii:ii2] = (x[:,i+1])
     end
     y,A
 end
