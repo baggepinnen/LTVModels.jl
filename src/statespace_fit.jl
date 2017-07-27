@@ -5,7 +5,7 @@ export fit_statespace, fit_statespace_gd, fit_statespace_constrained
 #     n,T  = size(x)
 #     T   -= 1
 #     m    = size(u,1)
-# 
+#
 #     Dx   = getD(D,T)
 #     k    = Convex.Variable(T,n^2+n*m)
 #
@@ -36,7 +36,7 @@ function Lcurve(fun, lambdas)
     errors, lambdas
 end
 
-function fit_statespace_gd(x,u,lambda, initializer::Symbol=:kalman ; extend=false,kwargs...)
+function fit_statespace_gd(x,u,lambda; initializer::Symbol=:kalman, extend=false,kwargs...)
     y,A     = matrices(x,u)
     n,T     = size(x)
     m       = size(u,1)
@@ -46,61 +46,67 @@ function fit_statespace_gd(x,u,lambda, initializer::Symbol=:kalman ; extend=fals
         k = repmat(k',T,1)
         k .+= 0.00001randn(size(k))
     else
-        model = fit_model(KalmanModel, x[:,1:end-1],u[:,1:end-1],x[:,2:end],0.00001*eye(n^2+n*m),eye(n), extend=false)
+        R1 = 0.1*eye(n^2+n*m)
+        R2 = 10eye(n)
+        P0 = 10000R1
+        model = fit_model(KalmanModel, x[:,1:end-1],u[:,1:end-1],x[:,2:end],R1,R2,P0, extend=false)
         k = [flatten(model.At) flatten(model.Bt)]
     end
     fit_statespace_gd(x,u,lambda, k; extend=extend, kwargs...)
 end
 
-function fit_statespace_gd(x,u,lambda, k; normType = 1, D = 1, step=0.001, iters=10000, decay_rate=0.999, momentum=0.9, print_period = 100, reduction=0, adaptive=true, extend=true, kwargs...)
+function fit_statespace_gd(x,u,lambda, k; normType = 1, D = 1, step=0.001, iters=10000, lasso=0, decay_rate=0.999, momentum=0.9, print_period = 100, reduction=0, adaptive=true, extend=true, kwargs...)
     if reduction > 0
         decay_rate = decayfun(iters, reduction)
     end
-    y,A     = matrices(x,u)
+    const y, A     = matrices(x,u)
     nparams = size(A,2)
     n,T     = size(x)
     T      -= 1
     m       = size(u,1)
     bestk   = copy(k)
-    diff_fun = D == 2 ? x-> diff(diff(x,2),2) : x-> diff(x,2)
+    diff_fun = D == 2 ? x-> diff(diff(x,1),1) : x-> diff(x,1)
     function lossfun(k2)
         loss    = 0.
-        for i = 1:T
+        @inbounds for i = 1:T
             ii = (i-1)*n+1
             ii2 = ii+n-1
-            loss += mean((y[ii:ii2,:] - A[ii:ii2,:]*k2[i,:]).^2)
+            @views loss += mean((y[ii:ii2,:] - A[ii:ii2,:]*k2[i,:]).^2)
         end
         NK = length(k2)
         if normType == 1
-            loss += lambda/NK*sum( sqrt.(sum(diff_fun(k2).^2, 1)) )
+            loss += lambda^2/NK*sum( sqrt.(sum(diff_fun(k2).^2, 2)) )
         else
             loss += lambda/NK*sum(diff_fun(k2).^2)
         end
+        if lasso > 0
+        loss += lasso^2*sum(abs.(k2))
+    end
         loss
     end
-    loss_tape   = GradientTape(lossfun, (k,))
     inputs      = (k,)
-    results     = (similar(k),)
-    all_results = map(DiffBase.GradientResult, results)
+    loss_tape   = GradientTape(lossfun, inputs)
+    results     = similar.(inputs)
+    all_results = DiffBase.GradientResult.(results)
     mom         = zeros(k)
     bestcost    = lossfun(k)
     costs       = Inf*ones(iters+1); costs[1] = bestcost
     steps       = zeros(iters)
+    # opt         = RMSpropOptimizer(k, step, 0.8, momentum)
+    opt         = ADAMOptimizer(k; α = step,  β1 = 0.9, β2 = 0.999, ɛ = 1e-8)
     for iter = 1:iters
         steps[iter] = step
         gradient!(all_results, loss_tape, inputs)
-        mom .= step.*all_results[1].derivs[1] + momentum*mom
-        k .-= mom
-        costs[iter+1] = lossfun(k) #all_results[1].value
-        iter % print_period == 0 && println("Iteration: ", iter, " cost: ", round(costs[iter],6), " stepsize: ", step)
-        if costs[iter+1] <= bestcost
-            # bestk .= k
-            bestcost = costs[iter+1]
-            step *= (adaptive ? 10^(1/200) : decay_rate)
-        elseif iter > 10 && costs[iter+1] >= costs[iter-10]
-            step /= (adaptive ? 10^(1/200) : decay_rate)
-            # k .= 0.5.*bestk .+ 0.5.*k; mom .*= 0
+        costs[iter] = all_results[1].value
+        # mom .= step.*all_results[1].derivs[1] .+ momentum.*mom
+        # k .-= mom
+        # opt(all_results[1].derivs[1])
+        opt(all_results[1].derivs[1], iter)
+        if iter % print_period == 0
+            println("Iteration: ", iter, " cost: ", round(costs[iter],6), " stepsize: ", step)
         end
+        step *=  decay_rate
+        opt.α = step
     end
 
     At,Bt = ABfromk(k,n,m,T)
@@ -108,7 +114,7 @@ function fit_statespace_gd(x,u,lambda, k; normType = 1, D = 1, step=0.001, iters
 end
 
 function fit_statespace_constrained(x,u,changepoints::AbstractVector; extend=true)
-    y,A           = matrices(x,u)
+    const y,A     = matrices(x,u)
     n,T           = size(x)
     m             = size(u,1)
     nc            = length(changepoints)
@@ -131,32 +137,28 @@ end
 # Tests ========================================================================
 
 # Iterative solver =============================================================
-function test_fit_statespace(lambda)
+function test_fit_statespace()
     # Generate data
-    srand(1)
-    D        = 1
+
     T_       = 400
-    n        = 2
-    At_      = [0.95 0.1; 0 0.95]
-    Bt_      = reshape([0.2; 1],2,1)
-    u        = randn(1,T_)
-    x        = zeros(n,T_)
-    for t = 1:T_-1
-        if t == 200
-            At_ = [0.5 0.05; 0 0.5]
-        end
-        x[:,t+1] = At_*x[:,t] + Bt_*u[t] + 0.2randn(n)
-    end
-    xm = x + 0.2randn(size(x));
-    model, cost, steps = fit_statespace_gd(xm,u,lambda, normType = 1, D = D, step=1e-4, momentum=0.992, iters=5000, reduction=0.1, adaptive=true, extend=true);
+    x,xm,u,n,m = LTVModels.testdata(T_)
+
+    model, cost, steps = fit_statespace_gd(xm,u,300, normType = 1, D = 1, lasso = 1e-4, step=5e-3, momentum=0.99, iters=5000, reduction=0.1, extend=true);
     y = predict(model,x,u);
     At,Bt = model.At,model.Bt
     e = x[:,2:end] - y[:,1:end-1]
     println("RMS error: ",rms(e))
 
     plot(flatten(At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
-    plot!([1,199], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
-    plot!([200,400], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
+    plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
+    plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
+
+    # R1          = 0.1*eye(n^2+n*m) # Increase for faster adaptation
+    # R2          = 10*eye(n)
+    # P0          = 10000R1
+    # modelk = fit_model(KalmanModel, x[:,1:end-1],u[:,1:end-1],x[:,2:end],R1,R2,P0,extend=true)
+    # plot!(flatten(modelk.At), l=(2,:auto), lab="Kalman", c=:red)
+
     # # savetikz("figs/ss.tex", PyPlot.gcf())#, [" axis lines = middle,enlargelimits = true,"])
     #
     # plot(y, lab="Estimated state values", l=(:solid,), xlabel="Time index", ylabel="State value", grid=false, layout=2)
@@ -172,15 +174,30 @@ function test_fit_statespace(lambda)
     fit_statespace_constrained(x,u,changepoints)
 
 
-    model2, cost2, steps2 = fit_statespace_gd(xm,u,10lambda, normType = 2, D = D, step=0.01, momentum=0.992, iters=5000, reduction=0.1, adaptive=true, extend=true);
+    model2, cost2, steps2 = fit_statespace_gd(xm,u,2000, normType = 1, D = 2, step=0.05, momentum=0.99, iters=10000, reduction=0.002, extend=true);
     y2 = predict(model2,x,u);
     At2,Bt2 = model2.At,model2.Bt
     e2 = x[:,2:end] - y2[:,1:end-1]
     println("RMS error: ",rms(e2))
-
     plot(flatten(At2), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
-    plot!([1,199], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
-    plot!([200,400], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
+    plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
+    plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
+
+
+    model2, cost2, steps2 = fit_statespace_gd(xm,u,1e10, normType = 2, D = 2, step=0.01, momentum=0.99, iters=15000, reduction=0.01, extend=true, lasso=1e-4);
+    y2 = predict(model2,x,u);
+    At2,Bt2 = model2.At,model2.Bt
+    e2 = x[:,2:end] - y2[:,1:end-1]
+    println("RMS error: ",rms(e2))
+    plot(flatten(At2), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
+    plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
+    plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
 
     rms(e)
+end
+
+if false
+Profile.clear()
+@profile fit_statespace_gd(xm,u,10000, normType = 1, D = D, step=5e-3, momentum=0.99, iters=500, reduction=0.1, extend=true);
+ProfileView.view()
 end

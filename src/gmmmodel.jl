@@ -137,26 +137,8 @@ function test_gmmmodel()
         return T
     end
 
-    n           = 3
-    m           = 2
-    T           = 1000
-    A           = zeros(n,n,T)
-    B           = zeros(n,m,T)
-    x           = zeros(n,T)
-    xnew        = zeros(n,T)
-    u           = randn(m,T)
-    U,S,V       = toOrthoNormal(randn(n,n)), diagm(0.5rand(n)), toOrthoNormal(randn(n,n))
-    A[:,:,1]    = U*S*V'
-    B[:,:,1]    = 0.5randn(n,m)
-    x[:,1]      = 0.1randn(n)
-
-    for t = 1:T-1
-        x[:,t+1]   = A[:,:,t]*x[:,t] + B[:,:,t]*u[:,t] + 0.001randn(n)
-        xnew[:,t]  = x[:,t+1]
-        A[:,:,t+1] = A[:,:,t] + 0.001randn(n,n)
-        B[:,:,t+1] = B[:,:,t] + 0.001randn(n,m)
-    end
-    x,u,xnew = x',u',xnew'
+    A,B,x,xnew,u,n,m,N = testdata(T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
+    
     model = fit_model(GMMModel, x,u,xnew, 5,doplot = false, nTries = 5, d1 = 6)
 
     xnewhat = predict(model,x,u)

@@ -14,7 +14,7 @@ function toeplitz{T}(c::Array{T},r::Array{T})
     A = zeros(T, nc, nr)
     A[:,1] = c
     A[1,:] = r
-    for i in 2:nr
+    @views for i in 2:nr
         A[2:end,i] = A[1:end-1,i-1]
     end
     A
@@ -67,7 +67,7 @@ function ABfromk(k,n,m,T)
 end
 
 """
-    At,Bt = segments2full(parameters,breakpoints,n,m,T)
+At,Bt = segments2full(parameters,breakpoints,n,m,T)
 """
 function segments2full(parameters,breakpoints,n,m,T)
     At,Bt = zeros(n,n,T), zeros(n,m,T)
@@ -106,3 +106,139 @@ end
 # filterlength=2; minh=5; threshold=-Inf; minw=18; maxw=Inf; doplot=true
 # plot(activationf)
 # scatter!(peaks,activationf[peaks])
+
+
+"""
+A,B,x,xnew,u,n,m,N = testdata(T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
+"""
+function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
+    srand(1)
+    n           = 3
+    m           = 2
+    T           = 10000
+    N           = n*(n+m)
+    A           = zeros(n,n,T)
+    B           = zeros(n,m,T)
+    x           = zeros(n,T)
+    xnew        = zeros(n,T)
+    u           = randn(m,T)
+    U,S,V       = toOrthoNormal(randn(n,n)), diagm(0.4rand(n)), toOrthoNormal(randn(n,n))
+    A[:,:,1]    = U*S*V'
+    B[:,:,1]    = 0.5randn(n,m)
+    x[:,1]      = 0.1randn(n)
+
+    for t = 1:T-1
+        x[:,t+1]   = A[:,:,t]*x[:,t] + B[:,:,t]*u[:,t] + σ_state_drift*randn(n)
+        xnew[:,t]  = x[:,t+1]
+        A[:,:,t+1] = A[:,:,t] + σ_param_drift*randn(n,n)
+        B[:,:,t+1] = B[:,:,t] + σ_param_drift*randn(n,m)
+    end
+    A,B,x,xnew,u,n,m,N
+end
+
+"""
+x,xm,u,n,m = testdata(T_)
+"""
+function testdata(T_)
+    srand(1)
+
+    n,m      = 2,1
+    At_      = [0.95 0.1; 0 0.95]
+    Bt_      = reshape([0.2; 1],2,1)
+    u        = randn(1,T_)
+    x        = zeros(n,T_)
+    for t = 1:T_-1
+        if t == T_÷2
+            At_ = [0.5 0.05; 0 0.5]
+        end
+        x[:,t+1] = At_*x[:,t] + Bt_*u[:,t] + 0.2randn(n)
+    end
+    xm = x + 0.2randn(size(x));
+    x,xm,u,n,m
+end
+
+
+
+# Optimizers ===================================================================
+
+
+struct RMSpropOptimizer{VecType}
+    α::Float64
+    rmspropfactor::Float64
+    momentum::Float64
+    Θ::VecType
+    dΘs::VecType
+    dΘs2::VecType
+end
+
+function RMSpropOptimizer(Θ, α, rmspropfactor=0.8, momentum=0.1)
+    RMSpropOptimizer(α, rmspropfactor, momentum, Θ, ones(Θ), zeros(Θ))
+end
+
+
+function apply_gradient!(opt, dΘ)
+    opt.dΘs .= opt.rmspropfactor.*opt.dΘs .+ (1-opt.rmspropfactor).*dΘ.^2
+    ΔΘ = -opt.α * dΘ
+    ΔΘ ./= sqrt.(opt.dΘs.+1e-10) # RMSprop
+
+    # ΔΘ = dΘ./sqrt(dΘs+1e-10).*sqrt(dΘs2) # ADAdelta
+    # dΘs2 .= 0.9dΘs2 + 0.1ΔΘ.^2 # ADAdelta
+    opt.dΘs2 .= opt.momentum.*opt.dΘs2 .+ ΔΘ # Momentum + RMSProp
+    opt.Θ .+= opt.dΘs2
+end
+
+(opt::RMSpropOptimizer)(dΘ) = apply_gradient!(opt, dΘ)
+
+
+
+mutable struct ADAMOptimizer{T, VecType <: AbstractArray}
+    Θ::VecType
+    α::T
+    β1::T
+    β2::T
+    ɛ::T
+    m::VecType
+    v::VecType
+end
+
+ADAMOptimizer{T,VecType <: AbstractArray}(Θ::VecType; α::T = 0.005,  β1::T = 0.9, β2::T = 0.999, ɛ::T = 1e-8, m=zeros(Θ), v=zeros(Θ)) = ADAMOptimizer{T,VecType}(Θ, α,  β1, β2, ɛ, m, v)
+
+"""
+    (a::ADAMOptimizer{T,VecType})(g::VecType, t::Integer)
+Applies the gradient `g` to the parameters `a.Θ` (mutating) at iteration `t`
+ADAM GD update http://sebastianruder.com/optimizing-gradient-descent/index.html#adam
+"""
+function (a::ADAMOptimizer)(g, t::Integer)
+    mul = (1-a.β1)
+    mul2 = (1-a.β2)
+    div  = 1/(1 - a.β1 ^ t)
+    div2 = 1/(1 - a.β2 ^ t)
+    α,β1,β2,ɛ,m,v,Θ = a.α,a.β1,a.β2,a.ɛ,a.m,a.v,a.Θ
+    Base.Threads.@threads for i = 1:length(g)
+        @inbounds m[i] = β1 * m[i] + mul * g[i]
+        @inbounds v[i] = β2 * v[i] + mul2 * g[i]^2
+        @inbounds Θ[i] -= α * m[i] * div / (sqrt(v[i] * div2) + ɛ)
+    end
+    Θ
+end
+# function (a::ADAMOptimizer)(g, t::Integer)
+#     a.m .= a.β1 .* a.m .+ (1-a.β1) .* g
+#     a.v .= a.β2 .* a.v .+ (1-a.β2) .* g.^2
+#     div  = 1/(1 - a.β1 ^ t)
+#     div2 = 1/(1 - a.β2 ^ t)
+#     @. a.Θ  -= a.α * a.m * div / (sqrt(a.v * div2) + a.ɛ)
+# end
+
+if false
+using Revise, BenchmarkTools, LTVModels
+const g = 0.000001randn(1_000_000);
+const Θ = zeros(g)
+const opt = LTVModels.ADAMOptimizer(Θ)
+function f(n)
+    for i = 1:n
+        opt(g,1000)
+    end
+end
+
+@time f(1000)
+end

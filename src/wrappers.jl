@@ -1,5 +1,3 @@
-# fit_model!(model::KalmanModel, x,u,xnew,R1,R2, extend=false)::KalmanModel
-export fit_model
 
 function fit_model(::Type{SimpleLTVModel}, fitmethod, args...; kwargs...)
     fun = if fitmethod == :gd
