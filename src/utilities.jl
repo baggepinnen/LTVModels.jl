@@ -56,6 +56,7 @@ function matrices(x,u)
     y,A
 end
 flatten(A) = reshape(A,prod(size(A,1,2)),size(A,3))'
+flatten(model::LTVStateSpaceModel) = [flatten(model.At) flatten(model.Bt)]
 decayfun(iters, reduction) = reduction^(1/iters)
 
 function ABfromk(k,n,m,T)
@@ -241,4 +242,31 @@ function f(n)
 end
 
 @time f(1000)
+end
+
+
+@views model2statevec(model,t) = [model.At[:,:,t]  model.Bt[:,:,t]]' |> vec
+
+function model2statevec(model)
+    k = [flatten(model.At) flatten(model.Bt)]
+    if model.extended
+        k = k[1:end-1,:]
+    end
+    k
+end
+
+
+function statevec2model(k,n,m,extend)
+    if extend
+        k = [k; k[end,:]]
+    end
+    T = size(k,1)
+    At = zeros(n,n,T)
+    Bt = zeros(n,m,T)
+    for t = 1:T
+        ABt      = reshape(k[:,t],n+m,n)'
+        At[:,:,t] .= ABt[:,1:n]
+        Bt[:,:,t] .= ABt[:,n+1:end]
+    end
+    SimpleLTVModel(At,Bt,extend)
 end

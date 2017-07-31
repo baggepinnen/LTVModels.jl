@@ -28,6 +28,7 @@ function fit_model!(model::KalmanModel, x,u,xnew,R1,R2, P0=100R1; extend=false, 
         model.Bt[:,:,end] .= model.Bt[:,:,end-1]
         Pkn = cat(3,Pkn, Pkn[:,:,end])
     end
+    model.extended = extend
     model.Pt = Pkn
     if printfit
         yhat = predict(model, x,u)
@@ -38,18 +39,18 @@ function fit_model!(model::KalmanModel, x,u,xnew,R1,R2, P0=100R1; extend=false, 
     return model
 end
 
+
 function fit_model!(model::KalmanModel, prior::KalmanModel, args...; printfit = true, kwargs...)::KalmanModel
     model = fit_model!(model, args...; printfit = false, kwargs...) # Fit model in the standard way without prior
     n,m,T = size(model.Bt)
-    # @views state(model,t) = [vec(model.At[:,:,t]);  vec(model.Bt[:,:,t])][:]
-    # @views state(model,t) = [model.At[:,:,t]  model.Bt[:,:,t]] |> vec
-    @views state(model,t) = [model.At[:,:,t]  model.Bt[:,:,t]]' |> vec
+    # @views model2statevec(model,t) = [vec(model.At[:,:,t]);  vec(model.Bt[:,:,t])][:]
+    # @views model2statevec(model,t) = [model.At[:,:,t]  model.Bt[:,:,t]] |> vec
     @views for t = 1:T     # Incorporate prior
         Pkk               = model.Pt[:,:,t]
         K̄                 = Pkk/(Pkk + prior.Pt[:,:,t])
         model.Pt[:,:,t] .-= K̄*Pkk
-        x                 = state(model,t)
-        xp                = state(prior,t)
+        x                 = model2statevec(model,t)
+        xp                = model2statevec(prior,t)
         x               .+= K̄*(xp-x)
         ABt               = reshape(x,n+m,n)'
         model.At[:,:,t]  .= ABt[:,1:n]

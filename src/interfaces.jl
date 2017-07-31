@@ -25,34 +25,39 @@ abstract type LTVModel <: AbstractModel end
 
 abstract type LTVStateSpaceModel <: LTVModel end
 
-type SimpleLTVModel{T} <: LTVStateSpaceModel
+mutable struct SimpleLTVModel{T} <: LTVStateSpaceModel
     At::Array{T,3}
     Bt::Array{T,3}
-end
-function SimpleLTVModel(At,Bt,extend)
-    if extend
-        At = cat(3,At,At[:,:,end])
-        Bt = cat(3,Bt,Bt[:,:,end])
+    extended::Bool
+    function SimpleLTVModel{T}(At::Array{T,3},Bt::Array{T,3},extend::Bool)
+        if extend
+            At = cat(3,At,At[:,:,end])
+            Bt = cat(3,Bt,Bt[:,:,end])
+        end
+        return new(At,Bt,extend)
     end
-    SimpleLTVModel(At,Bt)
 end
 
-type KalmanModel{T} <: LTVStateSpaceModel
+SimpleLTVModel(At,Bt,extend::Bool) = SimpleLTVModel{eltype(At)}(At,Bt,extend)
+
+mutable struct KalmanModel{T} <: LTVStateSpaceModel
     At::Array{T,3}
     Bt::Array{T,3}
     Pt::Array{T,3}
-end
-
-function KalmanModel(At,Bt,Pt,extend)
-    if extend
-        At = cat(3,At,At[:,:,end])
-        Bt = cat(3,Bt,Bt[:,:,end])
-        Pt = cat(3,Pt,Pt[:,:,end])
+    extended::Bool
+    function KalmanModel{T}(At::Array{T,3},Bt::Array{T,3},Pt::Array{T,3},extend::Bool)
+        if extend
+            At = cat(3,At,At[:,:,end])
+            Bt = cat(3,Bt,Bt[:,:,end])
+            Pt = cat(3,Pt,Pt[:,:,end])
+        end
+        return new(At,Bt,Pt,extend)
     end
-    KalmanModel(At,Bt,Pt)
 end
 
-type GMMModel <: AbstractModel
+KalmanModel(At,Bt,Pt,extend::Bool=false) = KalmanModel{eltype(At)}(At,Bt,Pt,extend)
+
+mutable struct GMMModel <: AbstractModel
     M
     dynamics
     T

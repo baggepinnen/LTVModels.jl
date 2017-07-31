@@ -45,26 +45,26 @@ function fit_statespace_gd(x,u,lambda; initializer::Symbol=:kalman, extend=false
         k = A\y
         k = repmat(k',T,1)
         k .+= 0.00001randn(size(k))
+        model = statevec2model(k,n,m,false)
     else
         R1 = 0.1*eye(n^2+n*m)
         R2 = 10eye(n)
         P0 = 10000R1
         model = fit_model(KalmanModel, x[:,1:end-1],u[:,1:end-1],x[:,2:end],R1,R2,P0, extend=false)
-        k = [flatten(model.At) flatten(model.Bt)]
     end
-    fit_statespace_gd(x,u,lambda, k; extend=extend, kwargs...)
+    fit_statespace_gd!(model, x,u,lambda; extend=extend, kwargs...)
 end
 
-function fit_statespace_gd(x,u,lambda, k; normType = 1, D = 1, step=0.001, iters=10000, lasso=0, decay_rate=0.999, momentum=0.9, print_period = 100, reduction=0, adaptive=true, extend=true, kwargs...)
+function fit_statespace_gd!(model::AbstractModel,x,u,lambda; normType = 1, D = 1, step=0.001, iters=10000, lasso=0, decay_rate=0.999, momentum=0.9, print_period = 100, reduction=0, extend=true, kwargs...)
     if reduction > 0
         decay_rate = decayfun(iters, reduction)
     end
+    k = model2statevec(model)
     const y, A     = matrices(x,u)
     nparams = size(A,2)
     n,T     = size(x)
     T      -= 1
     m       = size(u,1)
-    bestk   = copy(k)
     diff_fun = D == 2 ? x-> diff(diff(x,1),1) : x-> diff(x,1)
     function lossfun(k2)
         loss    = 0.
@@ -89,7 +89,7 @@ function fit_statespace_gd(x,u,lambda, k; normType = 1, D = 1, step=0.001, iters
     results     = similar.(inputs)
     all_results = DiffBase.GradientResult.(results)
     mom         = zeros(k)
-    bestcost    = lossfun(k)
+    @show bestcost    = lossfun(k)
     costs       = Inf*ones(iters+1); costs[1] = bestcost
     steps       = zeros(iters)
     # opt         = RMSpropOptimizer(k, step, 0.8, momentum)
@@ -110,7 +110,7 @@ function fit_statespace_gd(x,u,lambda, k; normType = 1, D = 1, step=0.001, iters
     end
 
     At,Bt = ABfromk(k,n,m,T)
-    SimpleLTVModel(At,Bt,extend),costs, steps
+    SimpleLTVModel{eltype(At)}(At,Bt,extend),costs, steps
 end
 
 function fit_statespace_constrained(x,u,changepoints::AbstractVector; extend=true)
