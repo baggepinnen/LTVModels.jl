@@ -6,7 +6,8 @@ end
 # TODO: introduce directional forgetting!!
 # TODO: predict with covariacne (filter). This should include both model covariacne and state covariance for kalman models
 
-function fit_model!(model::KalmanModel, x,u,xnew,R1,R2, P0=100R1; extend=false, printfit=true)::KalmanModel
+function fit_model!(model::KalmanModel, xi,u,R1,R2, P0=100R1; extend=false, printfit=true)::KalmanModel
+    x,u,xnew = xi[:,1:end-1],u[:,1:end-1],xi[:,2:end]
     n,T = size(x)
     @assert T > n "The calling convention for x and u is that time is the second dimention"
     Ta  = extend ? T+1 : T
@@ -121,12 +122,12 @@ end
 
 function test_kalmanmodel(T = 10000)
 
-    A,B,x,xnew,u,n,m,N = testdata(T=T, σ_state_drift=0.001, σ_param_drift=0.001)
+    A,B,x,u,n,m,N = LTVModels.testdata(T=T, σ_state_drift=0.001, σ_param_drift=0.001)
 
     R1          = 0.001*eye(n^2+n*m) # Increase for faster adaptation
     R2          = 10*eye(n)
     P0          = 10000R1
-    @time model = fit_model(KalmanModel, copy(x),copy(u),copy(xnew),R1,R2,P0,extend=true)
+    @time model = fit_model(KalmanModel, copy(x),copy(u),R1,R2,P0,extend=true)
 
     normA  = [norm(A[:,:,t]) for t                = 1:T]
     normB  = [norm(B[:,:,t]) for t                = 1:T]
@@ -143,7 +144,7 @@ function test_kalmanmodel(T = 10000)
         P[:,:,i] .= 0.01eye(N)
     end
     prior = KalmanModel(A,B,P) # Use ground truth as prior
-    @time model = fit_model!(model, prior, copy(x),copy(u),copy(xnew),R1,R2,P0,extend=true)
+    @time model = fit_model!(model, prior, copy(x),copy(u),R1,R2,P0,extend=true)
     errorAp = [norm(A[:,:,t]-model.At[:,:,t]) for t = 1:T]
     errorBp = [norm(B[:,:,t]-model.Bt[:,:,t]) for t = 1:T]
     plot!([errorAp errorBp], lab=["errAp" "errBp"], show=true, subplot=1)

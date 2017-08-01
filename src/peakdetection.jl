@@ -44,7 +44,9 @@ function remove_width(peaks,activation,minw,maxw)
         end
         i += 1
     end
-    @assert minimum(diff(peaks)) >= minw
+    if !isempty(peaks)
+        @assert minimum(diff(peaks)) >= minw
+    end
     peaks
 end
 

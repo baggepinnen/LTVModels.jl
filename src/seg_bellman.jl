@@ -42,6 +42,7 @@ end
     return e⋅e
 end
 
+using Base.Threads
 function seg_bellman(y,M,w, costfun=cost_const, argminfun=argmin_const; doplot=false)
     n = length(w)
     @assert (M < n) "M must be smaller than the length of the data sequence"
@@ -81,6 +82,9 @@ function seg_bellman(y,M,w, costfun=cost_const, argminfun=argmin_const; doplot=f
 
     # last Bellman iterate
     V = [(memorymat[1,jj] == Inf ? costfun(y,w,1,jj,argminfun) : memorymat[1,jj])+fi[jj+1] for jj = 1:n-M]
+    if isempty(V) || length(V) <= M
+        error("Failed to perform segmentation, try lowering M")
+    end
     doplot && plot!(V, lab="V")
 
     # backward pass
@@ -133,7 +137,7 @@ function benchmark_ss(T_, M, doplot=false)
     # T_       = 400
     x,xm,u,n,m = testdata(T_)
     input = matrices(xm,u)
-    V,t,a = seg_bellman(input,M, ones(T_-1), cost_ss, argmin_ss, doplot=false)
+    @time V,t,a = seg_bellman(input,M, ones(T_-1), cost_ss, argmin_ss, doplot=false)
     if doplot
         k = hcat(a...)'
         At = reshape(k[:,1:n^2]',n,n,M+1)

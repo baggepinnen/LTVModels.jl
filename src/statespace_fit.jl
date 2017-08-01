@@ -50,7 +50,7 @@ function fit_statespace_gd(x,u,lambda; initializer::Symbol=:kalman, extend=false
         R1 = 0.1*eye(n^2+n*m)
         R2 = 10eye(n)
         P0 = 10000R1
-        model = fit_model(KalmanModel, x[:,1:end-1],u[:,1:end-1],x[:,2:end],R1,R2,P0, extend=false)
+        model = fit_model(KalmanModel, x,u,R1,R2,P0, extend=false)
     end
     fit_statespace_gd!(model, x,u,lambda; extend=extend, kwargs...)
 end
@@ -68,10 +68,10 @@ function fit_statespace_gd!(model::AbstractModel,x,u,lambda; normType = 1, D = 1
     diff_fun = D == 2 ? x-> diff(diff(x,1),1) : x-> diff(x,1)
     function lossfun(k2)
         loss    = 0.
-        @inbounds for i = 1:T
+        for i = 1:T
             ii = (i-1)*n+1
             ii2 = ii+n-1
-            @views loss += mean((y[ii:ii2,:] - A[ii:ii2,:]*k2[i,:]).^2)
+            @inbounds @views loss += mean((y[ii:ii2,:] - A[ii:ii2,:]*k2[i,:]).^2)
         end
         NK = length(k2)
         if normType == 1
@@ -156,7 +156,7 @@ function test_fit_statespace()
     # R1          = 0.1*eye(n^2+n*m) # Increase for faster adaptation
     # R2          = 10*eye(n)
     # P0          = 10000R1
-    # modelk = fit_model(KalmanModel, x[:,1:end-1],u[:,1:end-1],x[:,2:end],R1,R2,P0,extend=true)
+    # modelk = fit_model(KalmanModel, x,u,R1,R2,P0,extend=true)
     # plot!(flatten(modelk.At), l=(2,:auto), lab="Kalman", c=:red)
 
     # # savetikz("figs/ss.tex", PyPlot.gcf())#, [" axis lines = middle,enlargelimits = true,"])

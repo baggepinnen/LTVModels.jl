@@ -76,7 +76,7 @@ function segments2full(parameters,breakpoints,n,m,T)
     for t = 1:T
         i ∈ breakpoints && (i+=1)
         At[:,:,t] = reshape(parameters[i][1:n^2],n,n)'
-        Bt[:,:,t] = reshape(parameters[i][n^2+1:end],n,m)'
+        Bt[:,:,t] = reshape(parameters[i][n^2+1:end],m,n)'
     end
     At,Bt
 end
@@ -121,7 +121,6 @@ function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
     A           = zeros(n,n,T)
     B           = zeros(n,m,T)
     x           = zeros(n,T)
-    xnew        = zeros(n,T)
     u           = randn(m,T)
     U,S,V       = toOrthoNormal(randn(n,n)), diagm(0.4rand(n)), toOrthoNormal(randn(n,n))
     A[:,:,1]    = U*S*V'
@@ -130,11 +129,10 @@ function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
 
     for t = 1:T-1
         x[:,t+1]   = A[:,:,t]*x[:,t] + B[:,:,t]*u[:,t] + σ_state_drift*randn(n)
-        xnew[:,t]  = x[:,t+1]
         A[:,:,t+1] = A[:,:,t] + σ_param_drift*randn(n,n)
         B[:,:,t+1] = B[:,:,t] + σ_param_drift*randn(n,m)
     end
-    A,B,x,xnew,u,n,m,N
+    A,B,x,u,n,m,N
 end
 
 """
