@@ -1,4 +1,4 @@
-export fit_statespace, fit_statespace_gd, fit_statespace_constrained
+export fit_statespace, fit_statespace_gd, fit_statespace_constrained, fit_statespace_gd!, fit_statespace_jump!
 
 # function fit_statespace(x,u,lambda; normType = 2, D = 2, solver=:ECOS, kwargs...)
 #     y,A  = matrices(x,u)
@@ -75,13 +75,13 @@ function fit_statespace_gd!(model::AbstractModel,x,u,lambda; normType = 1, D = 1
         end
         NK = length(k2)
         if normType == 1
-            loss += lambda^2/NK*sum( sqrt.(sum(diff_fun(k2).^2, 2)) )
+            loss += lambda^2/NK*sum( sqrt.(sum(diff_fun(k2./std(k2,1)).^2, 2)) )
         else
             loss += lambda/NK*sum(diff_fun(k2).^2)
         end
         if lasso > 0
-        loss += lasso^2*sum(abs.(k2))
-    end
+            loss += lasso^2*sum(abs.(k2))
+        end
         loss
     end
     inputs      = (k,)
@@ -94,7 +94,7 @@ function fit_statespace_gd!(model::AbstractModel,x,u,lambda; normType = 1, D = 1
     steps       = zeros(iters)
     # opt         = RMSpropOptimizer(k, step, 0.8, momentum)
     opt         = ADAMOptimizer(k; α = step,  β1 = 0.9, β2 = 0.999, ɛ = 1e-8)
-    for iter = 1:iters
+    @progress for iter = 1:iters
         steps[iter] = step
         gradient!(all_results, loss_tape, inputs)
         costs[iter] = all_results[1].value
@@ -143,15 +143,17 @@ function test_fit_statespace()
     T_       = 400
     x,xm,u,n,m = LTVModels.testdata(T_)
 
-    model, cost, steps = fit_statespace_gd(xm,u,300, normType = 1, D = 1, lasso = 1e-4, step=5e-3, momentum=0.99, iters=5000, reduction=0.1, extend=true);
+    model, cost, steps = fit_statespace_gd(xm,u,20, normType = 1, D = 1, lasso = 1e-8, step=5e-3, momentum=0.99, iters=100, reduction=0.1, extend=true);
+    model = fit_statespace_jump!(model, xm,u,20, normType = 1, D = 1, lasso = 1e-8, extend=true);
+    # model, cost, steps = fit_statespace_gd!(model,xm,u,100, normType = 1, D = 1, lasso = 1e-8, step=5e-3, momentum=0.99, iters=1000, reduction=0.1, extend=true);
     y = predict(model,x,u);
-    At,Bt = model.At,model.Bt
     e = x[:,2:end] - y[:,1:end-1]
+    At,Bt = model.At,model.Bt
     println("RMS error: ",rms(e))
 
     plot(flatten(At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
     plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
-    plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
+    plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false);gui()
 
     # R1          = 0.1*eye(n^2+n*m) # Increase for faster adaptation
     # R2          = 10*eye(n)
@@ -174,7 +176,7 @@ function test_fit_statespace()
     fit_statespace_constrained(x,u,changepoints)
 
 
-    model2, cost2, steps2 = fit_statespace_gd(xm,u,2000, normType = 1, D = 2, step=0.05, momentum=0.99, iters=10000, reduction=0.002, extend=true);
+    model2, cost2, steps2 = fit_statespace_gd(xm,u,5000, normType = 1, D = 2, step=0.01, iters=10000, reduction=0.1, extend=true);
     y2 = predict(model2,x,u);
     At2,Bt2 = model2.At,model2.Bt
     e2 = x[:,2:end] - y2[:,1:end-1]
@@ -184,7 +186,7 @@ function test_fit_statespace()
     plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
 
 
-    model2, cost2, steps2 = fit_statespace_gd(xm,u,1e10, normType = 2, D = 2, step=0.01, momentum=0.99, iters=15000, reduction=0.01, extend=true, lasso=1e-4);
+    model2, cost2, steps2 = fit_statespace_gd(xm,u,1e10, normType = 2, D = 2, step=0.01, momentum=0.99, iters=10000, reduction=0.01, extend=true, lasso=1e-4);
     y2 = predict(model2,x,u);
     At2,Bt2 = model2.At,model2.Bt
     e2 = x[:,2:end] - y2[:,1:end-1]
@@ -200,4 +202,61 @@ if false
 Profile.clear()
 @profile fit_statespace_gd(xm,u,10000, normType = 1, D = D, step=5e-3, momentum=0.99, iters=500, reduction=0.1, extend=true);
 ProfileView.view()
+end
+
+
+
+
+
+
+using JuMP, Ipopt, SCS
+function fit_statespace_jump!(model::AbstractModel,x,u,lambda; normType = 1, D = 1,  lasso=0,  extend=true, kwargs...)
+    k             = model2statevec(model)
+    const y, A    = matrices(x,u)
+    nparams       = size(A,2)
+    n,T           = size(x)
+    T            -= 1
+    m             = size(u,1)
+    NK            = length(k)
+    diff_fun      = D == 2 ? x-> diff(diff(x,1),1) : x-> diff(x,1)
+    model         = Model(solver=SCSSolver(
+        max_iters = 40000,
+        eps       = 1e-5, # convergence tolerance: 1e-3 (default)
+        alpha     = 1.8, # relaxation parameter: 1.8 (default)
+        rho_x     = 1e-3, # x equality constraint scaling: 1e-3 (default)
+        cg_rate   = 2, # for indirect, tolerance goes down like (1/iter)^cg_rate: 2 (default)
+        verbose   = 1, # boolean, write out progress: 1 (default)
+        normalize = 0, # boolean, heuristic data rescaling: 1 (default)
+        scale     = 3 # if normalized, rescales by this factor: 5 (default)
+        ))
+
+    @variable(model,k2[i=1:T,j=1:nparams], start=k[i,j])
+    # for i in eachindex(k)
+    #     setvalue(k2[i], k[i])
+    # end
+    @variable(model, res_norm_const[1:T])
+    @variable(model, sum_res_norm_const)
+    @variable(model, reg_norm_const[1:T-1])
+    @variable(model, sum_reg_norm_const)
+    # @show size(k)
+    loss = 0
+    @constraints(model, begin
+        res_const[i=1:T], res_norm_const[i] >= norm((y[((i-1)*n+1):(((i-1)*n+1)+n-1),:] -   A[((i-1)*n+1):(((i-1)*n+1)+n-1),:]*k2[i,1:nparams]))
+    end)
+
+
+    dk = diff_fun(k2)
+
+
+    @constraint(model, reg_const[t=1:T-1], reg_norm_const[t] >= norm(dk[t,1:nparams]))
+
+    @constraint(model, sum_res_norm_const >= sum(res_norm_const))
+    @constraint(model, sum_reg_norm_const >= lambda*sum(reg_norm_const))
+
+    @objective(model,Min, sum_reg_norm_const + sum_res_norm_const)
+
+    status = solve(model)
+
+    At,Bt = ABfromk(getvalue(k2),n,m,T)
+    SimpleLTVModel{eltype(At)}(At,Bt,extend)
 end

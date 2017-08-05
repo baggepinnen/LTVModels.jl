@@ -58,7 +58,7 @@ function seg_bellman(y,M,w, costfun=cost_const, argminfun=argmin_const; doplot=f
 
     # iterate Bellman iteration
     fnext = Vector{Float64}(n)
-    for jj = M-1:-1:1
+    @progress for jj = M-1:-1:1
         for kk = jj:n-(M-jj)
             opt   = Inf
             optll = 0

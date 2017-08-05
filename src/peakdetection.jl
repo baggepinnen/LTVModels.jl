@@ -1,17 +1,17 @@
 
-function findpeaks(activation; filterlength=10, minh=0, threshold=-Inf, minw=0, maxw=Inf, doplot=false)
+function findpeaks(activation; filterlength=10, minh=0, threshold=-Inf, minw=0, maxw=Inf, doplot=false, kwargs...)
     activationf = filtfilt(ones(filterlength),[filterlength],activation)
-    doplot && plot!(activationf, lab="Filtered Activation")
+    doplot && plot!(activationf, lab="Filtered Activation", kwargs...)
 
     peaks = allpeaks(activationf)
-    doplot &&  scatter!(peaks, activationf[peaks], lab="All peaks")
+    doplot &&  scatter!(peaks, activationf[peaks], lab="All peaks", kwargs...)
 
     peaks = peaks[activationf[peaks] .>= minh] # Remove too small peaks
-    doplot &&  scatter!(peaks, activationf[peaks]*1.1, lab="Below minh removed")
+    doplot &&  scatter!(peaks, activationf[peaks]*1.1, lab="Below minh removed", kwargs...)
 
     peaks = remove_threshold(peaks,activationf,threshold)
     peaks = remove_width(peaks,activationf,minw,maxw)
-    doplot &&  scatter!(peaks, activationf[peaks]*1.2, lab="Too wide or narrow removed" , m=(10,:xcross))
+    doplot &&  scatter!(peaks, activationf[peaks]*1.2, lab="Too wide or narrow removed" , m=(10,:xcross), kwargs...)
     return peaks
 end
 

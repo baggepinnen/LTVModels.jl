@@ -1,4 +1,4 @@
-export toeplitz, toOrthoNormal, flatten, segment, segmentplot, rms, modelfit
+export toeplitz, toOrthoNormal, flatten, activation, segmentplot, rms, modelfit
 
 rms(x::AbstractVector) = sqrt(mean(x.^2))
 sse(x::AbstractVector) = x⋅x
@@ -8,6 +8,11 @@ sse(x::AbstractMatrix) = sum(x.^2,2)[:]
 modelfit(y,yh) = 100 * (1-rms(y.-yh)./rms(y.-mean(y)))
 aic(x::AbstractVector,d) = log(sse(x)) + 2d/size(x,2)
 
+"""
+    toeplitz{T}(c::AbstractArray{T},r::AbstractArray{T})
+
+Returns a Toeplitz matrix where `c` is the first column and `r` is the first row.
+"""
 function toeplitz{T}(c::Array{T},r::Array{T})
     nc = length(c)
     nr = length(r)
@@ -67,8 +72,26 @@ function ABfromk(k,n,m,T)
     At,Bt
 end
 
+@views model2statevec(model,t) = [model.At[:,:,t]  model.Bt[:,:,t]]' |> vec
+
+function model2statevec(model)
+    k = flatten(model)
+    if model.extended
+        k = k[1:end-1,:]
+    end
+    k
+end
+
+function statevec2model(k,n,m,extend)
+    At,Bt = ABfromk(k,n,m,T)
+    SimpleLTVModel(At,Bt,extend)
+end
+
+
 """
-At,Bt = segments2full(parameters,breakpoints,n,m,T)
+    At,Bt = segments2full(parameters,breakpoints,n,m,T)
+
+Takes a parameter vecor and breakpoints and returns At and Bt with length T
 """
 function segments2full(parameters,breakpoints,n,m,T)
     At,Bt = zeros(n,n,T), zeros(n,m,T)
@@ -81,27 +104,27 @@ function segments2full(parameters,breakpoints,n,m,T)
     At,Bt
 end
 
-
-
-
-segment(res) = segment(res...)
-segment(model::LTVStateSpaceModel) = segment(model.At,model.Bt)
-function segment(At,Bt, args...)
+activation(model::LTVStateSpaceModel; kwargs...) = activation(model.At,model.Bt; kwargs...)
+function activation(At,Bt; normalize=false)
     diffparams = (diff([flatten(At) flatten(Bt)],1)).^2
-    # diffparams .-= minimum(diffparams,1)
-    # diffparams ./= maximum(diffparams,1)
+    if normalize
+        diffparams .-= minimum(diffparams,1)
+        diffparams ./= maximum(diffparams,1)
+    end
     activation = sqrt.(sum(diffparams,2)[:])
     activation
 end
 
-function segmentplot(activation, state; filterlength=10, doplot=false, kwargs...)
-    plot(activation, lab="Activation")
+segmentplot(model::AbstractModel, state;  kwargs...) = segmentplot(activation(model),state;kwargs...)
+function segmentplot(act, state; filterlength=10, doplot=false, kwargs...)
+    plot(act, lab="Activation")
     ds = diff(state)
-    ma = mean(activation)
+    ma = mean(act)
     ds[ds.==0] = NaN
-    segments = findpeaks(activation; filterlength=filterlength, doplot=doplot, kwargs...)
-    doplot || scatter!(segments,[3ma], lab="Automatic segments", m=(10,:xcross))
+    segments = findpeaks(act; filterlength=filterlength, doplot=doplot, kwargs...)
+    doplot || scatter!(segments,3ma*ones(segments), lab="Automatic segments", m=(10,:xcross))
     scatter!(2ma*ds, lab="Manual segments", xlabel="Time index", m=(10,:cross))
+    segments
 end
 
 # filterlength=2; minh=5; threshold=-Inf; minw=18; maxw=Inf; doplot=true
@@ -110,7 +133,7 @@ end
 
 
 """
-A,B,x,xnew,u,n,m,N = testdata(T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
+    A,B,x,xnew,u,n,m,N = testdata(T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
 """
 function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
     srand(1)
@@ -240,31 +263,4 @@ function f(n)
 end
 
 @time f(1000)
-end
-
-
-@views model2statevec(model,t) = [model.At[:,:,t]  model.Bt[:,:,t]]' |> vec
-
-function model2statevec(model)
-    k = [flatten(model.At) flatten(model.Bt)]
-    if model.extended
-        k = k[1:end-1,:]
-    end
-    k
-end
-
-
-function statevec2model(k,n,m,extend)
-    if extend
-        k = [k; k[end,:]]
-    end
-    T = size(k,1)
-    At = zeros(n,n,T)
-    Bt = zeros(n,m,T)
-    for t = 1:T
-        ABt      = reshape(k[:,t],n+m,n)'
-        At[:,:,t] .= ABt[:,1:n]
-        Bt[:,:,t] .= ABt[:,n+1:end]
-    end
-    SimpleLTVModel(At,Bt,extend)
 end
