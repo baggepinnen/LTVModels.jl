@@ -296,7 +296,16 @@ function matrices2(x,u)
 end
 
 using ProximalOperators
-function fit_statespace_admm(model::AbstractModel,x,u,lambda; iters=10000, normType = 1, D = 1,  lasso=0,  extend=true, kwargs...)
+function fit_statespace_admm(model::AbstractModel,x,u,lambda;
+    iters      = 10000,
+    normType   = 1,
+    D          = 1,
+    lasso      = 0,
+    extend     = true,
+    tol        = 1e-5,
+    printerval = 100,
+    cb         = x -> (),
+    kwargs...)
 
 
     k             = LTVModels.model2statevec(model)'
@@ -308,34 +317,31 @@ function fit_statespace_admm(model::AbstractModel,x,u,lambda; iters=10000, normT
     NK            = length(k)
 
     fs = map(1:T) do t
-        ii = (t-1)*n+1
+        ii  = (t-1)*n+1
         ii2 = ii+n-1
-        a = Φ[ii:ii2,:]
-        Q = full(a'a)
-        q = -a'y[:,t]
+        a   = Φ[ii:ii2,:]
+        Q   = full(a'a)
+        q   = -a'y[:,t]
         QuadraticIterative(2Q,2q)
     end
     indsf = [((t-1)*nparams+1:t*nparams, ) for t = 1:T]
     proxf = SlicedSeparableSum(fs, indsf)
 
-    # gs = map(1:T-1) do t
-    #     NormL2(lambda)
-    # end
     indsg = [((t-1)*nparams+1:t*nparams, ) for t = 1:T-1]
     proxg = SlicedSeparableSum(NormL2(lambda), indsg)
-    x = copy(k[:])
-    A = speye(NK)
+    x     = copy(k[:])
+    A     = speye(NK)
     for i = 1:NK-nparams
         A[i, i+nparams] = -1
     end
-    A = A[1:end-nparams,:]
-    Ax = A*x
-    z,u = zeros(size(A*x)),  zeros(size(A*x))
-    Axz = Ax .- z
-    λ = 0.05
-    μ = 0.9*λ/4
+    A         = A[1:end-nparams,:]
+    Ax        = A*x
+    z,u       = diff(k,2)[:], zeros(size(A*x))
+    Axz       = Ax .- z
+    λ         = 0.05
+    μ         = 0.9*λ/4 # ||A||₂² = 4
     @assert 0 ≤ μ ≤ λ/4
-    Axzu = similar(u)
+    Axzu      = similar(u)
     proxf_arg = similar(x)
     proxg_arg = similar(u)
     for i = 1:iters
@@ -349,18 +355,25 @@ function fit_statespace_admm(model::AbstractModel,x,u,lambda; iters=10000, normT
         u       .+= Axz=#
 
         Axzu .= Axz.+u
-        # proxf_arg .= x - (μ/λ)*A'*Axzu
-        At_mul_B!(proxf_arg,A,Axzu)
+        At_mul_B!(proxf_arg,A,Axzu) # proxf_arg .= x - (μ/λ)*A'*Axzu
         scale!(proxf_arg, -(μ/λ))
         proxf_arg .+= x
         prox!(x, proxf, proxf_arg, μ)
-        A_mul_B!(Ax,A,x)
+        A_mul_B!(Ax,A,x) # Ax       .= A*x
         proxg_arg .= Ax .+ u
         prox!(z, proxg, proxg_arg, λ)
         Axz .= Ax .- z
-        i % 100 == 0 && println(norm(Axz))
         u       .+= Axz
 
+        nAxz = norm(Axz)
+        if i % printerval == 0
+            @printf("%d ||Ax-z||₂ %.6f\n", i,  nAxz)
+            cb(x)
+        end
+        if nAxz < tol
+            info("||Ax-z||₂ reached")
+            break
+        end
     end
     k = reshape(x,nparams,T)'
     model = LTVModels.statevec2model(k,n,m,true)
