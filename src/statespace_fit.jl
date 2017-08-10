@@ -139,22 +139,34 @@ end
 # Iterative solver =============================================================
 function test_fit_statespace()
     # Generate data
-using Revise
-using LTVModels, ProximalOperators
-    T_       = 1000
+# using Revise
+# using LTVModels, ProximalOperators
+    T_       = 400
     x,xm,u,n,m = LTVModels.testdata(T_)
 
     model, cost, steps = fit_statespace_gd(xm,u,20, normType = 1, D = 1, lasso = 1e-8, step=5e-3, momentum=0.99, iters=100, reduction=0.1, extend=true);
     # Profile.clear()
-    @time model = LTVModels.fit_statespace_admm(model, xm,u,20, normType = 1, D = 1, lasso = 1e-8, extend=true, iters=2000);
+
+    function callback(m)
+        plot(flatten(m.At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", show=true)
+    end
+    gr()
+
+    @time model = LTVModels.fit_statespace_admm(xm,u,17, extend=true,
+        iters    = 20000,
+        normType = 1,
+        zeroinit = true,
+        tol      = 1e-5,
+        ridge    = 0,
+        cb       = callback);
     # using ProfileView
     # ProfileView.view()
     # model, cost, steps = fit_statespace_gd!(model,xm,u,100, normType = 1, D = 1, lasso = 1e-8, step=5e-3, momentum=0.99, iters=1000, reduction=0.1, extend=true);
     y = predict(model,x,u);
     e = x[:,2:end] - y[:,1:end-1]
-    At,Bt = model.At,model.Bt
     println("RMS error: ",rms(e))
 
+    At,Bt = model.At,model.Bt
     plot(flatten(At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
     plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), l=(:dash,:black, 1))
     plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false);gui()
@@ -175,9 +187,9 @@ using LTVModels, ProximalOperators
     # plot([cost[1:end-1] steps], lab=["Cost" "Stepsize"],  xscale=:log10, yscale=:log10)
 
 
-    activation = segment(At,Bt)
-    changepoints = [findmax(activation)[2]]
-    fit_statespace_constrained(x,u,changepoints)
+    act = activation(model)
+    changepoints = [findmax(act)[2]]
+    fit_statespace_constrained(xm,u,changepoints)
 
 
     model2, cost2, steps2 = fit_statespace_gd(xm,u,5000, normType = 1, D = 2, step=0.01, iters=10000, reduction=0.1, extend=true);
@@ -296,28 +308,68 @@ function matrices2(x,u)
 end
 
 using ProximalOperators
-function fit_statespace_admm(model::AbstractModel,x,u,lambda;
+
+function fit_statespace_admm(x,u,lambda; initializer::Symbol=:kalman, extend=false,kwargs...)
+    y,A     = matrices(x,u)
+    n,T     = size(x)
+    m       = size(u,1)
+    T      -= 1
+    if initializer != :kalman
+        k = A\y
+        k = repmat(k',T,1)
+        model = statevec2model(k,n,m,false)
+    else
+        R1 = 0.1*eye(n^2+n*m)
+        R2 = 10eye(n)
+        P0 = 10000R1
+        model = fit_model(KalmanModel, x,u,R1,R2,P0, extend=false)
+    end
+    fit_statespace_admm!(model, x,u,lambda; extend=extend, kwargs...)
+end
+
+function fit_statespace_admm!(model::AbstractModel,x,u,lambda;
     iters      = 10000,
-    normType   = 1,
     D          = 1,
-    lasso      = 0,
     extend     = true,
     tol        = 1e-5,
     printerval = 100,
+    zeroinit   = false,
     cb         = nothing,
     λ          = 0.05,
-    μ          = 0.9*λ/4, # ||A||₂² = 4
+    μ          = λ/32, # 32 is the biggest possible ||A||₂²
+    ridge      = 0,
     kwargs...)
-    @assert 0 ≤ μ ≤ λ/4 "μ should be ≤ λ/4"# ||A||₂² = 4
 
 
-    k             = LTVModels.model2statevec(model)'
-    y, Φ          = LTVModels.matrices2(x,u)
-    nparams       = size(Φ,2)
-    n,T           = size(x)
-    T            -= 1
-    m             = size(u,1)
-    NK            = length(k)
+    k       = LTVModels.model2statevec(model)'
+    y, Φ    = LTVModels.matrices2(x,u)
+    nparams = size(Φ,2)
+    n,T     = size(x)
+    T      -= 1
+    m       = size(u,1)
+    NK      = length(k)
+    x       = zeroinit*copy(k[:])
+    A       = speye(NK)
+    if D == 1
+        normA2 = ridge > 0 ? 2*3.91 : 3.91
+        z       = zeroinit*diff(k,2)[:]
+        for i = 1:NK-nparams
+            A[i, i+nparams] = -1
+        end
+        A       = A[1:end-nparams,:]
+    elseif D == 2
+        normA2 = ridge > 0 ? 2*15.1 : 15.1
+        z       = zeroinit*diff(diff(k,2),2)[:]
+        for i = 1:NK-nparams
+            A[i, i+nparams] = -2
+        end
+        for i = 1:NK-2nparams
+            A[i, i+2nparams] = 1
+        end
+        A       = A[1:end-2nparams,:]
+    end
+
+    @assert 0 ≤ μ ≤ λ/normA2 "μ should be ≤ λ/$normA2"
 
     fs = map(1:T) do t
         ii  = (t-1)*n+1
@@ -330,29 +382,29 @@ function fit_statespace_admm(model::AbstractModel,x,u,lambda;
     indsf = [((t-1)*nparams+1:t*nparams, ) for t = 1:T]
     proxf = SlicedSeparableSum(fs, indsf)
 
-    indsg = [((t-1)*nparams+1:t*nparams, ) for t = 1:T-1]
-    proxg = SlicedSeparableSum(NormL2(lambda), indsg)
-    x     = copy(k[:])
-    A     = speye(NK)
-    for i = 1:NK-nparams
-        A[i, i+nparams] = -1
+    gs = fill(NormL2(lambda), T-D)
+    indsg = [((t-1)*nparams+1:t*nparams, ) for t = 1:T-D]
+
+    ## To add extra penalty
+    if ridge > 0
+        Q     = ridge*speye(nparams)
+        q     = ridge*spzeros(nparams)
+        gs2   = fill(Quadratic(Q,q), T-D)
+        gs    = [gs;gs2]
+        indsg = [indsg; indsg]
+        A     = [A; A]
+        z     = [z;z]
     end
-    A         = A[1:end-nparams,:]
+    ##
+
+    proxg = SlicedSeparableSum(gs, indsg)
     Ax        = A*x
-    z,u       = diff(k,2)[:], zeros(size(A*x))
+    u         = zeros(size(z))
     Axz       = Ax .- z
     Axzu      = similar(u)
     proxf_arg = similar(x)
     proxg_arg = similar(u)
     for i = 1:iters
-        #= proxf_arg = x - (μ/λ)*A'*(Axz.+u)
-        prox!(x, proxf, proxf_arg, μ)
-        Ax       .= A*x
-        proxg_arg = Ax .+ u
-        prox!(z, proxg, proxg_arg, λ)
-        Axz .= Ax .- z
-        i % 100 == 0 && println(norm(Axz))
-        u       .+= Axz=#
 
         Axzu .= Axz.+u
         At_mul_B!(proxf_arg,A,Axzu) # proxf_arg .= x - (μ/λ)*A'*Axzu
@@ -363,7 +415,7 @@ function fit_statespace_admm(model::AbstractModel,x,u,lambda;
         proxg_arg .= Ax .+ u
         prox!(z, proxg, proxg_arg, λ)
         Axz .= Ax .- z
-        u       .+= Axz
+        u  .+= Axz
 
         nAxz = norm(Axz)
         if i % printerval == 0
@@ -375,7 +427,7 @@ function fit_statespace_admm(model::AbstractModel,x,u,lambda;
             end
         end
         if nAxz < tol
-            info("||Ax-z||₂ reached")
+            info("||Ax-z||₂ ≤ tol")
             break
         end
     end
