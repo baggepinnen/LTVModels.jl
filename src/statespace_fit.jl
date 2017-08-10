@@ -304,8 +304,11 @@ function fit_statespace_admm(model::AbstractModel,x,u,lambda;
     extend     = true,
     tol        = 1e-5,
     printerval = 100,
-    cb         = x -> (),
+    cb         = nothing,
+    λ          = 0.05,
+    μ          = 0.9*λ/4, # ||A||₂² = 4
     kwargs...)
+    @assert 0 ≤ μ ≤ λ/4 "μ should be ≤ λ/4"# ||A||₂² = 4
 
 
     k             = LTVModels.model2statevec(model)'
@@ -338,9 +341,6 @@ function fit_statespace_admm(model::AbstractModel,x,u,lambda;
     Ax        = A*x
     z,u       = diff(k,2)[:], zeros(size(A*x))
     Axz       = Ax .- z
-    λ         = 0.05
-    μ         = 0.9*λ/4 # ||A||₂² = 4
-    @assert 0 ≤ μ ≤ λ/4
     Axzu      = similar(u)
     proxf_arg = similar(x)
     proxg_arg = similar(u)
@@ -368,7 +368,11 @@ function fit_statespace_admm(model::AbstractModel,x,u,lambda;
         nAxz = norm(Axz)
         if i % printerval == 0
             @printf("%d ||Ax-z||₂ %.6f\n", i,  nAxz)
-            cb(x)
+            if cb != nothing
+                k = reshape(x,n*(n+m),T)'
+                model = LTVModels.statevec2model(k,n,m,true)
+                cb(model)
+            end
         end
         if nAxz < tol
             info("||Ax-z||₂ reached")
