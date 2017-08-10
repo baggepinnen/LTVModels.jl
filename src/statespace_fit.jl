@@ -139,12 +139,16 @@ end
 # Iterative solver =============================================================
 function test_fit_statespace()
     # Generate data
-
-    T_       = 400
+using Revise
+using LTVModels, ProximalOperators
+    T_       = 1000
     x,xm,u,n,m = LTVModels.testdata(T_)
 
     model, cost, steps = fit_statespace_gd(xm,u,20, normType = 1, D = 1, lasso = 1e-8, step=5e-3, momentum=0.99, iters=100, reduction=0.1, extend=true);
-    model = fit_statespace_jump!(model, xm,u,20, normType = 1, D = 1, lasso = 1e-8, extend=true);
+    # Profile.clear()
+    @time model = LTVModels.fit_statespace_admm(model, xm,u,20, normType = 1, D = 1, lasso = 1e-8, extend=true, iters=2000);
+    # using ProfileView
+    # ProfileView.view()
     # model, cost, steps = fit_statespace_gd!(model,xm,u,100, normType = 1, D = 1, lasso = 1e-8, step=5e-3, momentum=0.99, iters=1000, reduction=0.1, extend=true);
     y = predict(model,x,u);
     e = x[:,2:end] - y[:,1:end-1]
@@ -152,7 +156,7 @@ function test_fit_statespace()
     println("RMS error: ",rms(e))
 
     plot(flatten(At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
-    plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
+    plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), l=(:dash,:black, 1))
     plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false);gui()
 
     # R1          = 0.1*eye(n^2+n*m) # Increase for faster adaptation
@@ -209,7 +213,7 @@ end
 
 
 
-using JuMP, Ipopt, SCS
+using JuMP, SCS, FirstOrderSolvers
 function fit_statespace_jump!(model::AbstractModel,x,u,lambda; normType = 1, D = 1,  lasso=0,  extend=true, kwargs...)
     k             = model2statevec(model)
     const y, A    = matrices(x,u)
@@ -219,33 +223,42 @@ function fit_statespace_jump!(model::AbstractModel,x,u,lambda; normType = 1, D =
     m             = size(u,1)
     NK            = length(k)
     diff_fun      = D == 2 ? x-> diff(diff(x,1),1) : x-> diff(x,1)
-    model         = Model(solver=SCSSolver(
-        max_iters = 40000,
-        eps       = 1e-5, # convergence tolerance: 1e-3 (default)
-        alpha     = 1.8, # relaxation parameter: 1.8 (default)
-        rho_x     = 1e-3, # x equality constraint scaling: 1e-3 (default)
-        cg_rate   = 2, # for indirect, tolerance goes down like (1/iter)^cg_rate: 2 (default)
-        verbose   = 1, # boolean, write out progress: 1 (default)
-        normalize = 0, # boolean, heuristic data rescaling: 1 (default)
-        scale     = 3 # if normalized, rescales by this factor: 5 (default)
-        ))
+    # model = Model(IpoptSolver())
+    # model         = Model(solver=SCSSolver(
+    #     max_iters = 40000,
+    #     eps       = 1e-5, # convergence tolerance: 1e-3 (default)
+    #     alpha     = 1.8, # relaxation parameter: 1.8 (default)
+    #     rho_x     = 1e-3, # x equality constraint scaling: 1e-3 (default)
+    #     cg_rate   = 2, # for indirect, tolerance goes down like (1/iter)^cg_rate: 2 (default)
+    #     verbose   = 1, # boolean, write out progress: 1 (default)
+    #     normalize = 0, # boolean, heuristic data rescaling: 1 (default)
+    #     scale     = 3 # if normalized, rescales by this factor: 5 (default)
+    #     ))
+    model = Model(solver=DR())
 
     @variable(model,k2[i=1:T,j=1:nparams], start=k[i,j])
-    # for i in eachindex(k)
-    #     setvalue(k2[i], k[i])
-    # end
+    for i in eachindex(k)
+        setvalue(k2[i], k[i])
+    end
     @variable(model, res_norm_const[1:T])
     @variable(model, sum_res_norm_const)
     @variable(model, reg_norm_const[1:T-1])
     @variable(model, sum_reg_norm_const)
-    # @show size(k)
+
+    @show size(k)
     loss = 0
     @constraints(model, begin
         res_const[i=1:T], res_norm_const[i] >= norm((y[((i-1)*n+1):(((i-1)*n+1)+n-1),:] -   A[((i-1)*n+1):(((i-1)*n+1)+n-1),:]*k2[i,1:nparams]))
     end)
+    # loss = 0
+    # for i = 1:T
+    #     loss = sum((y[((i-1)*n+1):(((i-1)*n+1)+n-1),:] -   A[((i-1)*n+1):(((i-1)*n+1)+n-1),:]*k2[i,1:nparams]).^2)
+    # end
 
 
-    dk = diff_fun(k2)
+    dk = diff_fun(k2)#.^2
+    # dk = sum(dk,2)
+    # diffs = dk .== 0
 
 
     @constraint(model, reg_const[t=1:T-1], reg_norm_const[t] >= norm(dk[t,1:nparams]))
@@ -255,8 +268,102 @@ function fit_statespace_jump!(model::AbstractModel,x,u,lambda; normType = 1, D =
 
     @objective(model,Min, sum_reg_norm_const + sum_res_norm_const)
 
+
+    # @objective(model,Min, loss)
+    # @constraint(model, sum(diffs) <= 2)
+
     status = solve(model)
 
     At,Bt = ABfromk(getvalue(k2),n,m,T)
     SimpleLTVModel{eltype(At)}(At,Bt,extend)
+end
+
+
+function matrices2(x,u)
+    n,T = size(x)
+    T -= 1
+    m = size(u,1)
+    y = x[:,2:end]
+    A = spzeros(T*n, n^2+n*m)
+    I = speye(n)
+    for i = 1:T
+        ii = (i-1)*n+1
+        ii2 = ii+n-1
+        A[ii:ii2,1:n^2] = kron(I,x[:,i]')
+        A[ii:ii2,n^2+1:end] = kron(I,u[:,i]')
+    end
+    y,A
+end
+
+using ProximalOperators
+function fit_statespace_admm(model::AbstractModel,x,u,lambda; iters=10000, normType = 1, D = 1,  lasso=0,  extend=true, kwargs...)
+
+
+    k             = LTVModels.model2statevec(model)'
+    y, Φ          = LTVModels.matrices2(x,u)
+    nparams       = size(Φ,2)
+    n,T           = size(x)
+    T            -= 1
+    m             = size(u,1)
+    NK            = length(k)
+
+    fs = map(1:T) do t
+        ii = (t-1)*n+1
+        ii2 = ii+n-1
+        a = Φ[ii:ii2,:]
+        Q = full(a'a)
+        q = -a'y[:,t]
+        QuadraticIterative(2Q,2q)
+    end
+    indsf = [((t-1)*nparams+1:t*nparams, ) for t = 1:T]
+    proxf = SlicedSeparableSum(fs, indsf)
+
+    # gs = map(1:T-1) do t
+    #     NormL2(lambda)
+    # end
+    indsg = [((t-1)*nparams+1:t*nparams, ) for t = 1:T-1]
+    proxg = SlicedSeparableSum(NormL2(lambda), indsg)
+    x = copy(k[:])
+    A = speye(NK)
+    for i = 1:NK-nparams
+        A[i, i+nparams] = -1
+    end
+    A = A[1:end-nparams,:]
+    Ax = A*x
+    z,u = zeros(size(A*x)),  zeros(size(A*x))
+    Axz = Ax .- z
+    λ = 0.05
+    μ = 0.9*λ/4
+    @assert 0 ≤ μ ≤ λ/4
+    Axzu = similar(u)
+    proxf_arg = similar(x)
+    proxg_arg = similar(u)
+    for i = 1:iters
+        #= proxf_arg = x - (μ/λ)*A'*(Axz.+u)
+        prox!(x, proxf, proxf_arg, μ)
+        Ax       .= A*x
+        proxg_arg = Ax .+ u
+        prox!(z, proxg, proxg_arg, λ)
+        Axz .= Ax .- z
+        i % 100 == 0 && println(norm(Axz))
+        u       .+= Axz=#
+
+        Axzu .= Axz.+u
+        # proxf_arg .= x - (μ/λ)*A'*Axzu
+        At_mul_B!(proxf_arg,A,Axzu)
+        scale!(proxf_arg, -(μ/λ))
+        proxf_arg .+= x
+        prox!(x, proxf, proxf_arg, μ)
+        A_mul_B!(Ax,A,x)
+        proxg_arg .= Ax .+ u
+        prox!(z, proxg, proxg_arg, λ)
+        Axz .= Ax .- z
+        i % 100 == 0 && println(norm(Axz))
+        u       .+= Axz
+
+    end
+    k = reshape(x,nparams,T)'
+    model = LTVModels.statevec2model(k,n,m,true)
+    # plot(flatten(model))
+    model
 end

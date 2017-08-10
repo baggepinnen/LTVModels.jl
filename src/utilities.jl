@@ -83,7 +83,7 @@ function model2statevec(model)
 end
 
 function statevec2model(k,n,m,extend)
-    At,Bt = ABfromk(k,n,m,T)
+    At,Bt = ABfromk(k,n,m,size(k,1))
     SimpleLTVModel(At,Bt,extend)
 end
 
