@@ -97,7 +97,7 @@ function segments2full(parameters,breakpoints,n,m,T)
     At,Bt = zeros(n,n,T), zeros(n,m,T)
     i = 1
     for t = 1:T
-        i ∈ breakpoints && (i+=1)
+        t ∈ breakpoints && (i+=1)
         At[:,:,t] = reshape(parameters[i][1:n^2],n,n)'
         Bt[:,:,t] = reshape(parameters[i][n^2+1:end],m,n)'
     end

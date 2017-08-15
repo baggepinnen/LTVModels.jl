@@ -52,5 +52,5 @@ end
 
 function allpeaks(activation)
     da = diff(activation)
-    peaks = find((diff(da) .< 0) & (da[1:end-1] .> 0) & (da[2:end] .< 0)) + 1
+    peaks = find((diff(da) .< 0) .& (da[1:end-1] .> 0) .& (da[2:end] .< 0)) + 1
 end

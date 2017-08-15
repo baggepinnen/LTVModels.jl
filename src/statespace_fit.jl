@@ -154,7 +154,7 @@ function test_fit_statespace()
 
     @time model = LTVModels.fit_statespace_admm(xm,u,17, extend=true,
         iters    = 20000,
-        normType = 1,
+        D        = 1,
         zeroinit = true,
         tol      = 1e-5,
         ridge    = 0,
@@ -336,7 +336,7 @@ function fit_statespace_admm!(model::AbstractModel,x,u,lambda;
     zeroinit   = false,
     cb         = nothing,
     λ          = 0.05,
-    μ          = λ/32, # 32 is the biggest possible ||A||₂²
+    μ          = λ/4/D^2/(ridge == 0 ? 1 : 2), # 32 is the biggest possible ||A||₂²
     ridge      = 0,
     kwargs...)
 

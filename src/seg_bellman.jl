@@ -22,6 +22,32 @@ end
 end
 
 
+# Piecewise linear segmentation ============================================
+@inline function argmin_lin(input,w,t1,t2)
+    y   = input[1]
+    A   = input[2]
+    yminus = A[t1:t2,1] - ysim[t1]
+    yreg = y[t1:t2]-yminus
+    ones(t2-t1+1,1)\yreg # TODO: does not take care of w yet
+end
+
+# inuti costfun måste hela y användas, dvs simulation i stället för prediction. Annars hamnar alla knutpunkter på kurvan.
+
+@inline function cost_lin(input,w,t1,t2,argminfun)
+    if t2 == t1
+        return Inf
+    end
+    y   = input[1]
+    A   = input[2]
+    n   = size(y,1) ÷ length(w)
+    k   = argminfun(input,w,t1,t2)
+    yminus = A[t1:t2,1] - ysim[t1]
+
+
+    e   = y[t1:t2]-yminus-ones(t2-t1+1,1)*k
+    return e⋅e
+end
+
 # Piecewise statespace segmentation ============================================
 @inline function argmin_ss(input,w,t1,t2)
     y   = input[1]
@@ -123,12 +149,35 @@ function benchmark_const(N, M=1, doplot=false)
     y = [0.1randn(N); 10+0.1randn(N); 20+0.1randn(N)+linspace(1,10,N)]
     V,t,a = @time seg_bellman(y,M, ones(y))
     if doplot
-    tplot = [1;t;n];
-    aplot = [a;a[end]];
-    plot(y)
-    plot!(tplot, aplot, l=:step);gui()
-end
+        tplot = [1;t;n];
+        aplot = [a;a[end]];
+        plot(y)
+        plot!(tplot, aplot, l=:step);gui()
+    end
     # yhat, x, a, b
+end
+
+function benchmark_lin(T_, M, doplot=false)
+
+    # M        = 1
+    # T_       = 400
+    x = sin.(linspace(0,2π,T_))
+    input = input = matrices(x,ones(x))
+    @time V,t,a = seg_bellman(input,M, ones(T_-1), cost_lin, argmin_lin, doplot=false)
+    if doplot
+        k = hcat(a...)'
+        At = reshape(k[:,1:n^2]',n,n,M+1)
+        At = permutedims(At, [2,1,3])
+        tplot = [1;t;T_];
+        plot()
+        for i = 1:M+1
+            plot!(tplot[i:i+1],flatten(At)[i,:]'.*ones(2), c=[:blue :green :red :magenta], xlabel="Time index", ylabel="Model coefficients")
+        end
+        plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
+        plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
+        gui()
+    end
+    V,t,a
 end
 
 function benchmark_ss(T_, M, doplot=false)
@@ -136,7 +185,8 @@ function benchmark_ss(T_, M, doplot=false)
     # M        = 1
     # T_       = 400
     x,xm,u,n,m = testdata(T_)
-    input = matrices(xm,u)
+    @show input = matrices(xm,u)
+
     @time V,t,a = seg_bellman(input,M, ones(T_-1), cost_ss, argmin_ss, doplot=false)
     if doplot
         k = hcat(a...)'
