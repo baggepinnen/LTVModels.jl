@@ -6,8 +6,8 @@ export predict, simulate, fit_model
 using DSP, Plots, Juno#, Convex, FirstOrderSolvers
 using Base.Test
 
-using ReverseDiff: GradientTape, GradientConfig,GradientResult, gradient!
-import DiffBase
+using ReverseDiff: GradientTape, GradientConfig, gradient!
+
 
 
 
