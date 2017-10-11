@@ -15,8 +15,8 @@ export KalmanModel, GMMModel
 using DSP, Plots, Juno#, Convex, FirstOrderSolvers
 using Base.Test
 
-using ReverseDiff: GradientTape, GradientConfig,GradientResult, gradient!
-import DiffBase
+using ReverseDiff: GradientTape, GradientConfig, gradient!
+
 
 mutable struct KalmanModel{T} <: LTVStateSpaceModel
     At::Array{T,3}

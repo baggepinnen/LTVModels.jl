@@ -224,7 +224,7 @@ end
 
 
 
-
+#=
 using JuMP, SCS, FirstOrderSolvers
 function fit_statespace_jump!(model::AbstractModel,x,u,lambda; normType = 1, D = 1,  lasso=0,  extend=true, kwargs...)
     k             = model2statevec(model)
@@ -290,6 +290,7 @@ function fit_statespace_jump!(model::AbstractModel,x,u,lambda; normType = 1, D =
     SimpleLTVModel{eltype(At)}(At,Bt,extend)
 end
 
+=#
 
 function matrices2(x,u)
     n,T = size(x)
