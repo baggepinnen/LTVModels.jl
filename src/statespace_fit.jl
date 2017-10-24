@@ -309,22 +309,26 @@ end
 
 using ProximalOperators
 
-function fit_statespace_admm(x,u,lambda; initializer::Symbol=:kalman, extend=false,kwargs...)
+function fit_statespace_admm(x,u,lambda; initializer::Symbol=:kalman, extend=false, zeroinit = false, kwargs...)
     y,A     = matrices(x,u)
     n,T     = size(x)
     m       = size(u,1)
     T      -= 1
-    if initializer != :kalman
-        k = A\y
-        k = repmat(k',T,1)
-        model = statevec2model(k,n,m,false)
+    if zeroinit
+        model = SimpleLTVModel(zeros(n,n,T), zeros(n,m,T), false)
     else
-        R1 = 0.1*eye(n^2+n*m)
-        R2 = 10eye(n)
-        P0 = 10000R1
-        model = fit_model(KalmanModel, x,u,R1,R2,P0, extend=false)
+        if initializer != :kalman
+            k = A\y
+            k = repmat(k',T,1)
+            model = statevec2model(k,n,m,false)
+        else
+            R1 = 0.1*eye(n^2+n*m)
+            R2 = 10eye(n)
+            P0 = 10000R1
+            model = fit_model(KalmanModel, x,u,R1,R2,P0, extend=false)
+        end
     end
-    fit_statespace_admm!(model, x,u,lambda; extend=extend, kwargs...)
+    fit_statespace_admm!(model, x,u,lambda; extend=extend, zeroinit=zeroinit, kwargs...)
 end
 
 function fit_statespace_admm!(model::AbstractModel,x,u,lambda;
