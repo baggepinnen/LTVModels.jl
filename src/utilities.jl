@@ -1,10 +1,10 @@
 export toeplitz, toOrthoNormal, flatten, activation, segmentplot, rms, modelfit
 
-rms(x::AbstractVector) = sqrt(mean(x.^2))
+rms(x::AbstractVector) = sqrt(mean(abs2,x))
 sse(x::AbstractVector) = x⋅x
 
-rms(x::AbstractMatrix) = sqrt.(mean(x.^2,2))[:]
-sse(x::AbstractMatrix) = sum(x.^2,2)[:]
+rms(x::AbstractMatrix) = sqrt.(mean(abs2,x,2))[:]
+sse(x::AbstractMatrix) = sum(abs2,x,2)[:]
 modelfit(y,yh) = 100 * (1-rms(y.-yh)./rms(y.-mean(y)))
 aic(x::AbstractVector,d) = log(sse(x)) + 2d/size(x,2)
 
@@ -13,7 +13,7 @@ aic(x::AbstractVector,d) = log(sse(x)) + 2d/size(x,2)
 
 Returns a Toeplitz matrix where `c` is the first column and `r` is the first row.
 """
-function toeplitz{T}(c::Array{T},r::Array{T})
+function toeplitz{T}(c::AbstractVector{T},r::AbstractVector{T})
     nc = length(c)
     nr = length(r)
     A = zeros(T, nc, nr)
@@ -24,6 +24,7 @@ function toeplitz{T}(c::Array{T},r::Array{T})
     end
     A
 end
+
 
 function toOrthoNormal(Ti)
     local T = deepcopy(Ti)
@@ -197,8 +198,7 @@ function RMSpropOptimizer(Θ, α, rmspropfactor=0.8, momentum=0.1)
     RMSpropOptimizer(α, rmspropfactor, momentum, Θ, ones(Θ), zeros(Θ))
 end
 
-
-function apply_gradient!(opt, dΘ)
+function (opt::RMSpropOptimizer)(dΘ)
     opt.dΘs .= opt.rmspropfactor.*opt.dΘs .+ (1-opt.rmspropfactor).*dΘ.^2
     ΔΘ = -opt.α * dΘ
     ΔΘ ./= sqrt.(opt.dΘs.+1e-10) # RMSprop
@@ -208,9 +208,6 @@ function apply_gradient!(opt, dΘ)
     opt.dΘs2 .= opt.momentum.*opt.dΘs2 .+ ΔΘ # Momentum + RMSProp
     opt.Θ .+= opt.dΘs2
 end
-
-(opt::RMSpropOptimizer)(dΘ) = apply_gradient!(opt, dΘ)
-
 
 
 mutable struct ADAMOptimizer{T, VecType <: AbstractArray}

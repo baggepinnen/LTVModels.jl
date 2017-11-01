@@ -76,10 +76,10 @@ function forward_kalman(y,C,R1,R2, P0)
     T   = size(y,2)
     xkk = zeros(n,T);
     Pkk = zeros(n,n,T)
-    for i = 0:na-1
+    for i = 0:na-1 # TODO: This should be an input, maybe only initialize with first n_param datapoints?
         ran = (i*sa+1):((i+1)*sa)
-        size(C[i+1,ran,:]'), size(y[i+1,:])
-        xkk[ran,1]    = C[i+1,ran,:]'\y[i+1,:]  # Initialize to global ls solution
+        data_to_use = 1:min(2n, size(y,2))
+        xkk[ran,1]    = C[i+1,ran,data_to_use]'\y[i+1,data_to_use]  # Initialize to semi-global ls solution
     end
     Pkk[:,:,1]  = P0
     xk         = copy(xkk)
@@ -92,7 +92,7 @@ function forward_kalman(y,C,R1,R2, P0)
     xkk[:,i]   = xk[:,i] + K*e
     Pkk[:,:,i] = (I - K*Ck)*Pk[:,:,i]
     @views for i = 2:T
-        Ak         = 1
+        Ak         = 1 # This just assumes a random walk, no additional dynamics
         Ck         = C[:,:,i]
         xk[:,i]    = Ak*xkk[:,i-1]
         Pk[:,:,i]  = Ak*Pkk[:,:,i-1]*Ak' + R1

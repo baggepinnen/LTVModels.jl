@@ -162,7 +162,7 @@ function benchmark_lin(T_, M, doplot=false)
     # M        = 1
     # T_       = 400
     x = sin.(linspace(0,2π,T_))
-    input = input = matrices(x,ones(x))
+    input = matrices(x,ones(x))
     @time V,t,a = seg_bellman(input,M, ones(T_-1), cost_lin, argmin_lin, doplot=false)
     if doplot
         k = hcat(a...)'
@@ -185,7 +185,7 @@ function benchmark_ss(T_, M, doplot=false)
     # M        = 1
     # T_       = 400
     x,xm,u,n,m = testdata(T_)
-    @show input = matrices(xm,u)
+    input = matrices(xm,u)
 
     @time V,t,a = seg_bellman(input,M, ones(T_-1), cost_ss, argmin_ss, doplot=false)
     if doplot
