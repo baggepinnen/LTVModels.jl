@@ -23,3 +23,15 @@ function fit_model(::Type{KalmanModel}, x,u,args...; extend=false, kwargs...)::K
     LTVModels.fit_model!(model, x,u,args...; extend=extend, kwargs...)
     model
 end
+
+
+function fit_model(::Type{KalmanModelTF}, x,u,na,nb,args...; extend=false, kwargs...)::KalmanModel
+    n,T = size(x)
+    T  -=1 # To split x in x and xnew
+    @assert T > n "The calling convention for x and u is time in the second dimention (n,T = size(x))"
+    m     = size(u,1)
+    N     = sum(nb) + na
+    model = KalmanModelTF(zeros(N,T), zeros(N,N,T),extend)
+    LTVModels.fit_model!(model, x,u,na,nb,args...; extend=extend, kwargs...)
+    model
+end

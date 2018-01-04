@@ -1,7 +1,6 @@
 export getARXregressor, find_na, arx, bopl_confidence, bopl_confidence!
 
 
-struct
 
 """
     getARXregressor(y::AbstractVecOrMat,u::AbstractVecOrMat, na, nb)
@@ -73,7 +72,7 @@ function find_na(y::AbstractVector,n::Int)
     scatter(error, show=true)
 end
 
-fit_model(::ARXmodel,args...; kwargs...) = arx(args...; kwargs...)
+fit_model(::TransferFunction, args...; kwargs...) = arx(args...; kwargs...)
 
 """
     Gtf, Σ = arx(h,y, u, na, nb; λ = 0)

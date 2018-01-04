@@ -34,6 +34,8 @@ function toOrthoNormal(Ti)
     return T
 end
 
+const ⟂ = toOrthoNormal
+
 function getD(D,T)
     if D == 3
         return sparse(toeplitz([-1; zeros(T-4)],[-1 3 -3 1 zeros(1,T-4)]))
@@ -134,7 +136,9 @@ end
 
 
 """
-    A,B,x,xnew,u,n,m,N = testdata(T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
+    A,B,x,u,n,m,N = testdata(T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
+
+Slowly changing A and B
 """
 function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
     srand(1)
@@ -146,7 +150,7 @@ function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
     B           = zeros(n,m,T)
     x           = zeros(n,T)
     u           = randn(m,T)
-    U,S,V       = toOrthoNormal(randn(n,n)), diagm(0.4rand(n)), toOrthoNormal(randn(n,n))
+    U,S,V       = ⟂(randn(n,n)), diagm(0.4rand(n)), ⟂(randn(n,n))
     A[:,:,1]    = U*S*V'
     B[:,:,1]    = 0.5randn(n,m)
     x[:,1]      = 0.1randn(n)
@@ -160,7 +164,10 @@ function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
 end
 
 """
-x,xm,u,n,m = testdata(T_)
+    x,xm,u,n,m = testdata(T)
+
+Changes from `A = [0.95 0.1; 0 0.95]` to `A = [0.5 0.05; 0 0.5]`
+at T÷2
 """
 function testdata(T_)
     srand(1)
@@ -178,6 +185,30 @@ function testdata(T_)
     end
     xm = x + 0.2randn(size(x));
     x,xm,u,n,m
+end
+
+using ControlSystems
+"""
+    A,B,x,u,n,m,N,tfs = testdataTF(T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
+
+`polynomial_coeffs = tfs[time][num=1, den=2][1:ny,1:nu]`
+"""
+function testdataTF(;kwargs...)
+    A,B,x,u,n,m,N = testdata(;kwargs...)
+    n,T = size(A,1,3)
+    ny = n
+    nu = size(B,2)
+    Ck = eye(ny)
+    tfs = map(1:T) do k
+        Ak,Bk = A[:,:,k],B[:,:,k]
+        ubernum = Matrix{Vector}(ny,nu)
+        uberden = Matrix{Vector}(ny,nu)
+        for i = 1:nu, j=1:ny
+            ubernum[j,i],uberden[j,i] = ControlSystems.sisoss2tf(Ak, Bk[:,i], Ck[j,:]', 0) .|> real
+        end
+        ubernum,uberden
+    end
+    A,B,x,u,n,m,N,tfs
 end
 
 

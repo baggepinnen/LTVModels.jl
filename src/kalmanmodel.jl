@@ -5,6 +5,8 @@ end
 
 # TODO: introduce directional forgetting!!
 # TODO: predict with covariacne (filter). This should include both model covariacne and state covariance for kalman models
+# TODO: Enable imposing of known structure with e.g. a boolean matrix and a coefficient matrix to tell the algorithm which entries are known to be ==1, ==0, ==h etc.
+# Use this matrix to either set some values in C, xkn, Pkn, At,Bt to zero
 
 function fit_model!(model::KalmanModel, xi,u,R1,R2, P0=100R1; extend=false, printfit=true)::KalmanModel
     x,u,xnew = xi[:,1:end-1],u[:,1:end-1],xi[:,2:end]
