@@ -1,5 +1,5 @@
 export fit_statespace, fit_statespace_gd, fit_statespace_constrained, fit_statespace_gd!, fit_statespace_jump!
-
+using ProximalOperators
 # function fit_statespace(x,u,lambda; normType = 2, D = 2, solver=:ECOS, kwargs...)
 #     y,A  = matrices(x,u)
 #     n,T  = size(x)
@@ -353,18 +353,18 @@ function fit_statespace_admm!(model::AbstractModel,x,u,lambda;
     T      -= 1
     m       = size(u,1)
     NK      = length(k)
-    x       = zeroinit*copy(k[:])
+    x       = !zeroinit*copy(k[:])
     A       = speye(NK)
     if D == 1
         normA2 = ridge > 0 ? 2*3.91 : 3.91
-        z       = zeroinit*diff(k,2)[:]
+        z       = !zeroinit*diff(k,2)[:]
         for i = 1:NK-nparams
             A[i, i+nparams] = -1
         end
         A       = A[1:end-nparams,:]
     elseif D == 2
         normA2 = ridge > 0 ? 2*15.1 : 15.1
-        z       = zeroinit*diff(diff(k,2),2)[:]
+        z       = !zeroinit*diff(diff(k,2),2)[:]
         for i = 1:NK-nparams
             A[i, i+nparams] = -2
         end
@@ -376,27 +376,27 @@ function fit_statespace_admm!(model::AbstractModel,x,u,lambda;
 
     @assert 0 ≤ μ ≤ λ/normA2 "μ should be ≤ λ/$normA2"
 
-    fs = map(1:T) do t
+    fs = ntuple(T) do t
         ii  = (t-1)*n+1
         ii2 = ii+n-1
         a   = Φ[ii:ii2,:]
         Q   = full(a'a)
         q   = -a'y[:,t]
-        QuadraticIterative(2Q,2q)
+        ProximalOperators.QuadraticIterative(2Q,2q)
     end
-    indsf = [((t-1)*nparams+1:t*nparams, ) for t = 1:T]
+    indsf = ntuple(t->((t-1)*nparams+1:t*nparams, ), T)
     proxf = SlicedSeparableSum(fs, indsf)
 
-    gs = fill(NormL2(lambda), T-D)
-    indsg = [((t-1)*nparams+1:t*nparams, ) for t = 1:T-D]
+    gs = ntuple(t->NormL2(lambda), T-D)
+    indsg = ntuple(t->((t-1)*nparams+1:t*nparams, ) ,T-D)
 
     ## To add extra penalty
     if ridge > 0
         Q     = ridge*speye(nparams)
         q     = ridge*spzeros(nparams)
         gs2   = fill(Quadratic(Q,q), T-D)
-        gs    = [gs;gs2]
-        indsg = [indsg; indsg]
+        gs    = (gs...,gs2...)
+        indsg = (indsg..., indsg...)
         A     = [A; A]
         z     = [z;z]
     end
