@@ -126,31 +126,3 @@ function df(model::GMMModel,x,u)
     fxx=fxu=fuu = []
     return fx,fu,fxx,fxu,fuu
 end
-
-
-function test_gmmmodel()
-    function toOrthoNormal(Ti)
-        local T = deepcopy(Ti)
-        U_,S_,V_ = svd(T[1:3,1:3])
-        local R = U_*diagm([1,1,sign(det(U_*V_'))])*V_'
-        T[1:3,1:3] = R
-        return T
-    end
-
-    A,B,x,xnew,u,n,m,N = testdata(T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
-    
-    model = fit_model(GMMModel, x,u,xnew, 5,doplot = false, nTries = 5, d1 = 6)
-
-    xnewhat = predict(model,x,u)
-
-    plot(xnew, lab="x", show=true, layout=n)#, yscale=:log10)
-    plot!(xnewhat, lab="xhat")
-
-    fx,fu = df(model,x',u')[1:2]
-    normA  = [norm(A[:,:,t]) for t = 1:T]
-    normB  = [norm(B[:,:,t]) for t = 1:T]
-    errorA = [norm(A[:,:,t]-fx[:,:,t]) for t = 1:T]
-    errorB = [norm(B[:,:,t]-fu[:,:,t]) for t = 1:T]
-    plot([normA errorA normB errorB], lab=["normA" "errA" "normB" "errB"], show=true)#, yscale=:log10)
-
-end

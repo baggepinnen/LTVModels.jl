@@ -53,7 +53,6 @@ include("peakdetection.jl")
 include("statespace_fit.jl")
 include("seg_bellman.jl")
 include("kalmanmodel.jl")
-include("kalmanmodelTF.jl")
 # include("gmmmodel.jl") # Not yet working with julia v0.6
 include("statespace_utils.jl")
 include("wrappers.jl")
