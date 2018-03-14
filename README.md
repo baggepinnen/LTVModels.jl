@@ -59,7 +59,7 @@ The animation shows the estimated model coefficients `k[t] = A[t],B[t]` as a fun
 ## Fit model using Kalman smoother
 Code to fit a model by solving (7) using a Kalman smoother:
 
-The code generates an LTV model `A[t], B[t]` and time series `x,u` governed by the model. A model is then fit using a Kalman smoother and the true model coefficients as well as the estimated are plotted. The gif below illustrates how the choice of covariance parameter influences the estimated time-evolution of the model parameters.
+The code generates an LTV model `A[t], B[t]` and time series `x,u` governed by the model. A model is then fit using a Kalman smoother and the true model coefficients as well as the estimated are plotted. The gif below illustrates how the choice of covariance parameter influences the estimated time-evolution of the model parameters. As `R2`→0, the result approaches that of standard least-squares estimation of an LTI model.
 ```julia
 using LTVModels, Plots
 T = 2_000
@@ -67,7 +67,7 @@ A,B,x,u,n,m,N = LTVModels.testdata(T=T, σ_state_drift=0.001, σ_param_drift=0.0
 
 gr(size=(400,300))
 anim = @animate for r2 = logspace(-3,3,10)
-    R1          = 0.001*eye(n^2+n*m) # Increase for faster adaptation
+    R1          = 0.001*eye(n^2+n*m)
     R2          = r2*eye(n)
     P0          = 10000R1
     model = fit_model(KalmanModel, copy(x),copy(u),R1,R2,P0,extend=true)
@@ -88,7 +88,7 @@ To solve the optimization problem in section IID, see the function `fit_statespa
 See functions in files `peakdetection.jl` and function `fit_statespace_constrained`
 
 ## Figs. 2-3
-To appear
+The simulation of the two-link robot presented in figures 2-3 in the paper is generated using the code in [`two_link.jl`](https://github.com/baggepinnen/LTVModels.jl/blob/master/examples/two_link.jl)
 
 ## Fig. 4
 To appear

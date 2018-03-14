@@ -10,7 +10,7 @@ export predict, simulate, fit_model
 export KalmanModel, GMMModel
 
 
-using DSP, Plots, Juno#, Convex, FirstOrderSolvers
+using ControlSystems, DSP, Plots, Juno#, Convex, FirstOrderSolvers
 using Base.Test
 
 using ReverseDiff: GradientTape, GradientConfig, gradient!
