@@ -223,6 +223,27 @@ end
 
 using ProximalOperators
 
+
+"""
+model = fit_statespace_admm(x,u,lambda; initializer::Symbol=:kalman)
+
+Fit a model by solving `minimize ||y-ŷ||² + λ²||Dₓ k||` where `x` is 1 or 2
+using linearized ADMM
+
+See README for usage example
+
+# Keyword arguments
+iters      = 10000
+D          = 1 # Order of differentiation
+extend     = true
+tol        = 1e-5
+printerval = 100
+zeroinit   = false
+cb         = nothing # Callback function `model -> cb(model)`
+λ          = 0.05 # Regularization parameter
+μ          = λ/4/D^2/(ridge == 0 ? 1 : 2), # 32 is the biggest possible ||A||₂² # ADMM parameter
+ridge      = 0 # `ridge > 0` Add some L2 regularization (`||k||`)
+"""
 function fit_statespace_admm(x,u,lambda; initializer::Symbol=:kalman, extend=false, zeroinit = false, kwargs...)
     y,A     = matrices(x,u)
     n,T     = size(x)

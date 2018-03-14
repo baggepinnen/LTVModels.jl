@@ -1,6 +1,4 @@
-export getARXregressor, find_na, arx, bopl_confidence, bopl_confidence!
-
-
+export getARXregressor, find_na, arx, bodeconfidence
 
 """
     getARXregressor(y::AbstractVecOrMat,u::AbstractVecOrMat, na, nb)

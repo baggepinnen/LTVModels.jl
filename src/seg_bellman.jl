@@ -129,7 +129,14 @@ function seg_bellman(y,M,w, costfun=cost_const, argminfun=argmin_const; doplot=f
 end
 
 
+"""
+model = fit_statespace_dp(x,u, M; extend=true)
 
+Fit model using dynamic programming. `M` is the number of changepoints.
+
+See Bagge Carlson et al. 2018 section IID
+Usage example in function `benchmark_ss`
+"""
 function fit_statespace_dp(x,u, M; extend=true, kwargs...)
     n,T = size(x)
     m = size(u,1)

@@ -3,7 +3,13 @@ export plot_coeffs,plot_coeffs!,plot_eigvals
 
 
 length(m::LTVStateSpaceModel) = size(m.At,3)
+"""
+x' = predict(model, x, u)
+x' = predict(model, x, u, t)
 
+Form one-step prediction. If model is an LTVmodel, `x,u` and `model` must have the same length.
+If `t` is provided, use model at time `t` to predict a single output only.
+"""
 function predict(model::LTVStateSpaceModel, x, u)
     n,T  = size(x)
     @assert T<=length(model) "Can not predict further than the number of time steps in the model"
@@ -19,6 +25,11 @@ function predict(model::LTVStateSpaceModel, x, u, i)
     xnew = model.At[:,:,i] * x + model.Bt[:,:,i] * u
 end
 
+"""
+x' = simulate(model, x0, u)
+
+Simulate model forward in time from initial state `x0`. If model is an LTVmodel, `u` and `model` must have the same length.
+"""
 function simulate(model::LTVStateSpaceModel, x0, u)
     T = size(u,2)
     n = size(model.At,1)

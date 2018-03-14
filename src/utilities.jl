@@ -130,15 +130,11 @@ function segmentplot(act, state; filterlength=10, doplot=false, kwargs...)
     segments
 end
 
-# filterlength=2; minh=5; threshold=-Inf; minw=18; maxw=Inf; doplot=true
-# plot(activationf)
-# scatter!(peaks,activationf[peaks])
-
 
 """
     A,B,x,u,n,m,N = testdata(T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
 
-Slowly changing A and B
+Create an LTVModel with Brownian-walk A[t] and B[t]
 """
 function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
     srand(1)
@@ -166,7 +162,7 @@ end
 """
     x,xm,u,n,m = testdata(T)
 
-Changes from `A = [0.95 0.1; 0 0.95]` to `A = [0.5 0.05; 0 0.5]`
+Create an LTVModel that changes from `A = [0.95 0.1; 0 0.95]` to `A = [0.5 0.05; 0 0.5]`
 at T÷2
 """
 function testdata(T_)
@@ -185,30 +181,6 @@ function testdata(T_)
     end
     xm = x + 0.2randn(size(x));
     x,xm,u,n,m
-end
-
-using ControlSystems
-"""
-    A,B,x,u,n,m,N,tfs = testdataTF(T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
-
-`polynomial_coeffs = tfs[time][num=1, den=2][1:ny,1:nu]`
-"""
-function testdataTF(;kwargs...)
-    A,B,x,u,n,m,N = testdata(;kwargs...)
-    n,T = size(A,1,3)
-    ny = n
-    nu = size(B,2)
-    Ck = eye(ny)
-    tfs = map(1:T) do k
-        Ak,Bk = A[:,:,k],B[:,:,k]
-        ubernum = Matrix{Vector}(ny,nu)
-        uberden = Matrix{Vector}(ny,nu)
-        for i = 1:nu, j=1:ny
-            ubernum[j,i],uberden[j,i] = ControlSystems.sisoss2tf(Ak, Bk[:,i], Ck[j,:]', 0) .|> real
-        end
-        ubernum,uberden
-    end
-    A,B,x,u,n,m,N,tfs
 end
 
 
@@ -278,17 +250,3 @@ end
 #     div2 = 1/(1 - a.β2 ^ t)
 #     @. a.Θ  -= a.α * a.m * div / (sqrt(a.v * div2) + a.ɛ)
 # end
-
-if false
-using Revise, BenchmarkTools, LTVModels
-const g = 0.000001randn(1_000_000);
-const Θ = zeros(g)
-const opt = LTVModels.ADAMOptimizer(Θ)
-function f(n)
-    for i = 1:n
-        opt(g,1000)
-    end
-end
-
-@time f(1000)
-end

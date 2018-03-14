@@ -18,8 +18,9 @@ using LTVModels
 # Usage
 Usage of many of the functions is demonstrated in `tests/runtests.jl`
 
-Code to reproduce Fig. 1 in the paper
-
+To fit a model by solving  
+minimize ||y-ŷ||² + λ²||Dₓ k||  
+and to reproduce Fig. 1 in the paper
 ```julia
 using LTVModels, Plots
 gr(size=(400,300))
@@ -53,9 +54,12 @@ gui()
 ```
 ![window](figures/admm.gif)
 
+The animation shows the estimated model coefficients `k[t] = A[t],B[t]` as a function of time `t` converge as the optimization procedure is running. The final result is Fig. 1 in the paper.
 
-## Kalman smoother
-Code to fit a model by solving (7) using a Kalman smoother
+## Fit model using Kalman smoother
+Code to fit a model by solving (7) using a Kalman smoother:
+
+The code generates an LTV model `A[t], B[t]` and time series `x,u` governed by the model. A model is then fit using a Kalman smoother and the true model coefficients as well as the estimated are plotted. The gif below illustrates how the choice of covariance parameter influences the estimated time-evolution of the model parameters.
 ```julia
 using LTVModels, Plots
 T = 2_000
@@ -75,6 +79,7 @@ gif(anim, "kalman.gif", fps = 5)
 ```
 ![window](figures/kalman.gif)
 
+
 ## Dynamic programming solver
 To solve the optimization problem in section IID, see the function `fit_statespace_dp` with usage example in the function [`benchmark_ss`](https://github.com/baggepinnen/LTVModels.jl/blob/master/src/seg_bellman.jl#L183)
 
@@ -89,3 +94,13 @@ To appear
 To appear
 
 [DifferentialDynamicProgramming.jl](https://github.com/baggepinnen/DifferentialDynamicProgramming.jl/tree/dev)
+
+## ARX estimation
+This repository provides some functions for estimation of ARX models.
+- `Gtf, Σ = arx(h, y, u, na, nb; λ = 0)`  
+Fit a transfer Function to data using an ARX model.
+`nb` and `na` are the orders of the numerator and denominator polynomials. `h` is the sample time.
+- `getARXregressor`
+- `find_na` Find suitable model order
+- `parameter_covariance`
+- `bodeconfidence` Plot a bode diagram including confidence intervals

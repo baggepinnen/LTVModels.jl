@@ -5,11 +5,9 @@ dc,calculate_cost,calculate_final_cost,
 fit_model, predict, df,costfun, LTVStateSpaceModel,
 SimpleLTVModel
 
-export predict, simulate, fit_model, KalmanModelTF
+export predict, simulate, fit_model
 
 export KalmanModel, GMMModel
-
-
 
 
 using DSP, Plots, Juno#, Convex, FirstOrderSolvers
@@ -17,7 +15,12 @@ using Base.Test
 
 using ReverseDiff: GradientTape, GradientConfig, gradient!
 
-
+"""
+Struct representing a statespace model fit using a Kalman smoother
+# Fields
+- `At, Bt, Pt` all of type `Array{T,3}` with time in the last dimension
+- `extended::Bool` indicates whether or not the model has been extended by one time step to match the length of the input data.
+"""
 mutable struct KalmanModel{T} <: LTVStateSpaceModel
     At::Array{T,3}
     Bt::Array{T,3}
@@ -31,12 +34,6 @@ function KalmanModel{T}(At::Array{T,3},Bt::Array{T,3},Pt::Array{T,3},extend::Boo
         Pt = cat(3,Pt,Pt[:,:,end])
     end
     return KalmanModel{T}(At,Bt,Pt,extend)
-end
-
-struct KalmanModelTF
-    params
-    Pt
-    extended::Bool
 end
 
 KalmanModel(At,Bt,Pt,extend::Bool=false) = KalmanModel{eltype(At)}(At,Bt,Pt,extend)
