@@ -5,8 +5,7 @@
 2018-03-14: More documentation and instructions to appear shortly. If you want to use this package before documentation is complete, feel free to open an issue and I'll help you out.
 
 This repository implements the system-identification methods presented in  
-[Bagge Carlson, F.](https://www.control.lth.se/Staff/FredrikBaggeCarlson.html), Robertsson, A. & Johansson, R.  
-["Identification of LTV Dynamical Models with Smooth or Discontinuous Time Evolution by means of Convex Optimization"](https://arxiv.org/abs/1802.09794) (IEEE ICCA 2018).
+[Bagge Carlson, F.](https://www.control.lth.se/Staff/FredrikBaggeCarlson.html), Robertsson, A. & Johansson, R. ["Identification of LTV Dynamical Models with Smooth or Discontinuous Time Evolution by means of Convex Optimization"](https://arxiv.org/abs/1802.09794) (IEEE ICCA 2018).
 
 # Installation
 ```julia
@@ -59,7 +58,7 @@ The animation shows the estimated model coefficients `k[t] = A[t],B[t]` as a fun
 ## Fit model using Kalman smoother
 Code to fit a model by solving (7) using a Kalman smoother:
 
-The code generates an LTV model `A[t], B[t]` and time series `x,u` governed by the model. A model is then fit using a Kalman smoother and the true model coefficients as well as the estimated are plotted. The gif below illustrates how the choice of covariance parameter influences the estimated time-evolution of the model parameters. As `R2`→0, the result approaches that of standard least-squares estimation of an LTI model.
+The code generates an LTV model `A[t], B[t]` and time series `x,u` governed by the model. A model is then fit using a Kalman smoother and the true model coefficients as well as the estimated are plotted. The gif below illustrates how the choice of covariance parameter influences the estimated time-evolution of the model parameters. As `R2`→∞, the result approaches that of standard least-squares estimation of an LTI model.
 ```julia
 using LTVModels, Plots
 T = 2_000
