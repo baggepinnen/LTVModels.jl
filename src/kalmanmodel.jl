@@ -105,8 +105,7 @@ end
 
 
 function forward_kalman(y,C,R1,R2, P0)
-    na  = size(C,1)
-    n   = size(R1,1)
+    na,n  = size(C)
     ma  = (n-na^2) ÷ na
     sa  = na+ma
     T   = size(y,2)
@@ -117,11 +116,11 @@ function forward_kalman(y,C,R1,R2, P0)
         data_to_use = 1:min(2n, size(y,2))
         xkk[ran,1]    = C[i+1,ran,data_to_use]'\y[i+1,data_to_use]  # Initialize to semi-global ls solution
     end
-    Pkk[:,:,1]  = P0
+    copy!(@view(Pkk[:,:,1]), P0)
     xk         = copy(xkk)
     Pk         = copy(Pkk)
     i          = 1
-    Ck         = C[:,:,i]
+    Ck         = @view C[:,:,i]
     e          = y[:,i]-Ck*xk[:,i]
     S          = Ck*Pk[:,:,i]*Ck' + R2
     K          = (Pk[:,:,i]*Ck')/S
