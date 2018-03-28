@@ -1,5 +1,5 @@
 
-function fit_model(::Type{SimpleLTVModel}, fitmethod, args...; kwargs...)
+function SimpleLTVModel(fitmethod::Symbol, args...; kwargs...)
     fun = if fitmethod == :gd
         fit_statespace_gd
     elseif fitmethod == :scs
@@ -13,13 +13,13 @@ function fit_model(::Type{SimpleLTVModel}, fitmethod, args...; kwargs...)
 end
 
 
-function fit_model(::Type{KalmanModel}, x,u,args...; extend=false, kwargs...)::KalmanModel
+function KalmanModel(x,u,args...; extend=false, kwargs...)::KalmanModel
     n,T = size(x)
     T  -=1 # To split x in x and xnew
     @assert T > n "The calling convention for x and u is time in the second dimention (n,T = size(x))"
     m     = size(u,1)
     N     = n*(n+m)
     model = KalmanModel(zeros(n,n,T),zeros(n,m,T),zeros(N,N,T),extend)
-    LTVModels.fit_model!(model, x,u,args...; extend=extend, kwargs...)
+    LTVModels.KalmanModel(model, x,u,args...; extend=extend, kwargs...)
     model
 end

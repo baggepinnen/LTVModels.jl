@@ -69,7 +69,7 @@ anim = @animate for r2 = logspace(-3,3,10)
     R1          = 0.001*eye(n^2+n*m)
     R2          = r2*eye(n)
     P0          = 10000R1
-    model = fit_model(KalmanModel, copy(x),copy(u),R1,R2,P0,extend=true)
+    model = KalmanModel(copy(x),copy(u),R1,R2,P0,extend=true)
 
     plot(flatten(A), l=(2,), xlabel="Time index", ylabel="Model coefficients", lab="True", c=:red)
     plot!(flatten(model.At), l=(2,), lab="Estimated", c=:blue)

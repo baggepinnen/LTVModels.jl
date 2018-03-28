@@ -8,7 +8,7 @@ end
 # TODO: Enable imposing of known structure with e.g. a boolean matrix and a coefficient matrix to tell the algorithm which entries are known to be ==1, ==0, ==h etc.
 # Use this matrix to either set some values in C, xkn, Pkn, At,Bt to zero
 
-function fit_model!(model::KalmanModel, xi,u,R1,R2, P0=100R1; extend=false, printfit=true)::KalmanModel
+function KalmanModel(model::KalmanModel, xi,u,R1,R2, P0=100R1; extend=false, printfit=true)::KalmanModel
     x,u,xnew = xi[:,1:end-1],u[:,1:end-1],xi[:,2:end]
     n,T = size(x)
     @assert T > n "The calling convention for x and u is that time is the second dimention"
@@ -42,7 +42,7 @@ function fit_model!(model::KalmanModel, xi,u,R1,R2, P0=100R1; extend=false, prin
     return model
 end
 
-# function fit_model!(model::KalmanModel, x,u,xnew,R1,R2, P0=100R1; extend=false, printfit=true)::KalmanModel
+# function KalmanModel(model::KalmanModel, x,u,xnew,R1,R2, P0=100R1; extend=false, printfit=true)::KalmanModel
 #     x,u,xnew = xi[:,1:end-1],u[:,1:end-1],xi[:,2:end]
 #     n,T = size(x)
 #     @assert T > n "The calling convention for x and u is that time is the second dimention"
@@ -77,8 +77,8 @@ end
 # end
 
 
-function fit_model!(model::KalmanModel, prior::KalmanModel, args...; printfit = true, kwargs...)::KalmanModel
-    model = fit_model!(model, args...; printfit = false, kwargs...) # Fit model in the standard way without prior
+function KalmanModel(model::KalmanModel, prior::KalmanModel, args...; printfit = true, kwargs...)::KalmanModel
+    model = KalmanModel(model, args...; printfit = false, kwargs...) # Fit model in the standard way without prior
     n,m,T = size(model.Bt)
     # @views model2statevec(model,t) = [vec(model.At[:,:,t]);  vec(model.Bt[:,:,t])][:]
     # @views model2statevec(model,t) = [model.At[:,:,t]  model.Bt[:,:,t]] |> vec

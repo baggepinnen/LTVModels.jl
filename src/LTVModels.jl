@@ -2,10 +2,10 @@ module LTVModels
 using LTVModelsBase
 import LTVModelsBase: AbstractModel, AbstractCost, ModelAndCost, f,
 dc,calculate_cost,calculate_final_cost,
-fit_model, predict, df,costfun, LTVStateSpaceModel,
+predict, simulate, df,costfun, LTVStateSpaceModel,
 SimpleLTVModel
 
-export predict, simulate, fit_model
+export predict, simulate
 
 export KalmanModel, GMMModel
 
@@ -13,6 +13,7 @@ export KalmanModel, GMMModel
 using ControlSystems, DSP, Plots, Juno#, Convex, FirstOrderSolvers
 using Base.Test
 
+using DiffBase
 using ReverseDiff: GradientTape, GradientConfig, gradient!
 
 """

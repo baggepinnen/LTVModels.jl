@@ -70,7 +70,7 @@ function find_na(y::AbstractVector,n::Int)
     scatter(error, show=true)
 end
 
-fit_model(::TransferFunction, args...; kwargs...) = arx(args...; kwargs...)
+ControlSystems.TransferFunction(h,y::AbstractVector{Float64}, u::AbstractVector{Float64}, na, nb; kwargs...) = arx(h,y,u,na,nb; kwargs...)
 
 """
     Gtf, Σ = arx(h,y, u, na, nb; λ = 0)

@@ -50,7 +50,7 @@ function fit_statespace_gd(x,u,lambda; initializer::Symbol=:kalman, extend=false
         R1 = 0.1*eye(n^2+n*m)
         R2 = 10eye(n)
         P0 = 10000R1
-        model = fit_model(KalmanModel, x,u,R1,R2,P0, extend=false)
+        model = KalmanModel(x,u,R1,R2,P0, extend=false)
     end
     fit_statespace_gd!(model, x,u,lambda; extend=extend, kwargs...)
 end
@@ -260,7 +260,7 @@ function fit_statespace_admm(x,u,lambda; initializer::Symbol=:kalman, extend=fal
             R1 = 0.1*eye(n^2+n*m)
             R2 = 10eye(n)
             P0 = 10000R1
-            model = fit_model(KalmanModel, x,u,R1,R2,P0, extend=false)
+            model = KalmanModel(x,u,R1,R2,P0, extend=false)
         end
     end
     fit_statespace_admm!(model, x,u,lambda; extend=extend, zeroinit=zeroinit, kwargs...)

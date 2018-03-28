@@ -6,7 +6,7 @@ include("gmmutils.jl")
 
 
 """
-`M, dynamics, ass, T = fit_model!(model::GMMModel, x, u, y, K [,d1])`
+`M, dynamics, ass, T = GMMModel(model::GMMModel, x, u, y, K [,d1])`
 
 Fits a Gaussian mixture model to a set of data. The objective is to predict `y∈ ℜ N × ny` given `x,u`
 
@@ -14,7 +14,7 @@ Fits a Gaussian mixture model to a set of data. The objective is to predict `y�
 
 `d1` is the number of dimensions to project the data down to when fitting the model.
 """
-function fit_model!(model::GMMModel, x,u, xnew, K;
+function GMMModel(model::GMMModel, x,u, xnew, K;
     d1     = 2size(x,2)+size(u,2),
     doplot = false,
     nTries = 5)::GMMModel
@@ -73,9 +73,9 @@ function fit_model!(model::GMMModel, x,u, xnew, K;
     return model
 end
 
-function fit_model(::Type{GMMModel}, x, u, y, args...; kwargs...)::GMMModel
+function GMMModel(x, u, y, args...; kwargs...)::GMMModel
     model = GMMModel(0,0,0)
-    fit_model!(model, x, u, y, args...; kwargs...)
+    GMMModel(model, x, u, y, args...; kwargs...)
     model
 end
 

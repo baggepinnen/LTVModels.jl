@@ -70,6 +70,7 @@ end
 
 using Base.Threads
 function seg_bellman(y,M,w, costfun=cost_const, argminfun=argmin_const; doplot=false)
+    doplot = @static isinteractive() && doplot
     n = length(w)
     @assert (M < n) "M must be smaller than the length of the data sequence"
     B = zeros(Int,M-1,n) # back-pointer matrix
@@ -152,6 +153,7 @@ end
 # Tests
 # Dynamic programming ==========================================================
 function benchmark_const(N, M=1, doplot=false)
+    doplot = @static isinteractive() && doplot
     n = 3N
     y = [0.1randn(N); 10+0.1randn(N); 20+0.1randn(N)+linspace(1,10,N)]
     V,t,a = @time seg_bellman(y,M, ones(y))
@@ -165,6 +167,7 @@ function benchmark_const(N, M=1, doplot=false)
 end
 
 function benchmark_lin(T_, M, doplot=false)
+    doplot = @static isinteractive() && doplot
 
     # M        = 1
     # T_       = 400
@@ -188,6 +191,7 @@ function benchmark_lin(T_, M, doplot=false)
 end
 
 function benchmark_ss(T_, M, doplot=false)
+    doplot = @static isinteractive() && doplot
 
     # M        = 1
     # T_       = 400

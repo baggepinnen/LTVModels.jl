@@ -3,7 +3,7 @@ export toeplitz, toOrthoNormal, flatten, activation, segmentplot, rms, modelfit
 rms(x::AbstractVector) = sqrt(mean(abs2,x))
 sse(x::AbstractVector) = x⋅x
 
-rms(x::AbstractMatrix) = sqrt.(mean(abs2,x,2))[:]
+rms(x::AbstractMatrix) = sqrt.(mean(abs2.(x),2))[:]
 sse(x::AbstractMatrix) = sum(abs2,x,2)[:]
 modelfit(y,yh) = 100 * (1-rms(y.-yh)./rms(y.-mean(y)))
 aic(x::AbstractVector,d) = log(sse(x)) + 2d/size(x,2)
