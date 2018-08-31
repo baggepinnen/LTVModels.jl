@@ -10,7 +10,7 @@ export predict, simulate
 export KalmanModel, GMMModel
 
 
-using ControlSystems, DSP, Plots, Juno#, Convex, FirstOrderSolvers
+using DSP, Plots, Juno#, Convex, FirstOrderSolvers
 using Base.Test
 
 using DiffBase
