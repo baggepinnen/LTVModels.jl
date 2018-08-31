@@ -15,7 +15,7 @@ B     = [10,5] # B(z) coeffs
 u     = randn(100) # Simulate 100 time steps with Gaussian input
 y     = filt(B,A,u)
 yr,A  = getARXregressor(y,u,3,2) # We assume that we know the system order 3,2
-x     = A\yr # Estimate model polynomials
+x     = A\\yr # Estimate model polynomials
 plot([yr A*x], lab=["Signal" "Prediction"])
 ```
 For nonlinear ARX-models, see [BasisFunctionExpansions.jl](https://github.com/baggepinnen/BasisFunctionExpansions.jl/)
@@ -70,7 +70,7 @@ function find_na(y::AbstractVector,n::Int)
     scatter(error, show=true)
 end
 
-ControlSystems.TransferFunction(h,y::AbstractVector{Float64}, u::AbstractVector{Float64}, na, nb; kwargs...) = arx(h,y,u,na,nb; kwargs...)
+# ControlSystems.TransferFunction(h,y::AbstractVector{Float64}, u::AbstractVector{Float64}, na, nb; kwargs...) = arx(h,y,u,na,nb; kwargs...)
 
 """
     Gtf, Σ = arx(h,y, u, na, nb; λ = 0)
