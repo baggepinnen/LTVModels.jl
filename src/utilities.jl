@@ -13,7 +13,7 @@ aic(x::AbstractVector,d) = log(sse(x)) + 2d/size(x,2)
 
 Returns a Toeplitz matrix where `c` is the first column and `r` is the first row.
 """
-function toeplitz{T}(c::AbstractVector{T},r::AbstractVector{T})
+function toeplitz(c::AbstractVector{T},r::AbstractVector{T}) where T
     nc = length(c)
     nr = length(r)
     A = zeros(T, nc, nr)
@@ -223,7 +223,7 @@ mutable struct ADAMOptimizer{T, VecType <: AbstractArray}
     v::VecType
 end
 
-ADAMOptimizer{T,VecType <: AbstractArray}(Θ::VecType; α::T = 0.005,  β1::T = 0.9, β2::T = 0.999, ɛ::T = 1e-8, m=zeros(Θ), v=zeros(Θ)) = ADAMOptimizer{T,VecType}(Θ, α,  β1, β2, ɛ, m, v)
+ADAMOptimizer(Θ::VecType; α::T = 0.005,  β1::T = 0.9, β2::T = 0.999, ɛ::T = 1e-8, m=zeros(Θ), v=zeros(Θ)) where {T,VecType <: AbstractArray} = ADAMOptimizer{T,VecType}(Θ, α,  β1, β2, ɛ, m, v)
 
 """
     (a::ADAMOptimizer{T,VecType})(g::VecType, t::Integer)

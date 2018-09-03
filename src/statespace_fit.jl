@@ -60,7 +60,7 @@ function fit_statespace_gd!(model::AbstractModel,x,u,lambda; normType = 1, D = 1
         decay_rate = decayfun(iters, reduction)
     end
     k = model2statevec(model)
-    const y, A     = matrices(x,u)
+    y, A     = matrices(x,u)
     nparams = size(A,2)
     n,T     = size(x)
     T      -= 1
@@ -114,7 +114,7 @@ function fit_statespace_gd!(model::AbstractModel,x,u,lambda; normType = 1, D = 1
 end
 
 function fit_statespace_constrained(x,u,changepoints::AbstractVector; extend=true)
-    const y,A     = matrices(x,u)
+    y,A     = matrices(x,u)
     n,T           = size(x)
     m             = size(u,1)
     nc            = length(changepoints)
