@@ -137,7 +137,7 @@ end
 Create an LTVModel with Brownian-walk A[t] and B[t]
 """
 function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
-    srand(1)
+    Random.seed!(1)
     n           = 3
     m           = 2
     T           = 10000
@@ -166,7 +166,7 @@ Create an LTVModel that changes from `A = [0.95 0.1; 0 0.95]` to `A = [0.5 0.05;
 at T÷2
 """
 function testdata(T_)
-    srand(1)
+    Random.seed!(1)
 
     n,m      = 2,1
     At_      = [0.95 0.1; 0 0.95]

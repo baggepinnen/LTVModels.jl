@@ -1,5 +1,5 @@
 using LTVModels
-using Base.Test
+using Test
 using Plots
 
 function test_kalmanmodel(T = 10000)

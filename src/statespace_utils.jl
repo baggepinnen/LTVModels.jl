@@ -55,7 +55,7 @@ end
 function plot_eigvals(model::LTVModels.LTVStateSpaceModel, plot_circle=true)
     scatter(hcat([eigvals(model.At[:,:,t]) for t=1:length(model)]...)', title="Eigenvalues of dynamics matrix")
     if plot_circle
-        ϕ = linspace(0,2π,100)
+        ϕ = range(0, stop=2π, length=100)
         plot!(cos.(ϕ),sin.(ϕ), l=(:black,1))
     end
 end

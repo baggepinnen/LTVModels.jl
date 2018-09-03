@@ -58,7 +58,7 @@ cb = DiscreteCallback(condition,affect!)
 # Simulate robot using ODE-solver
 t      = 0:h:N*h
 q0     = [q[:,1]; qd[:,1]]
-prob   = OrdinaryDiffEq.ODEProblem((x,p,t)->time_derivative(x, u0[:,floor(Int,t/h)+1]),q0,(t[[1,end]]...))
+prob   = OrdinaryDiffEq.ODEProblem((x,p,t)->time_derivative(x, u0[:,floor(Int,t/h)+1]),q0,(t[[1,end]]...,))
 sol    = solve(prob,Tsit5(),reltol=1e-8,abstol=1e-8, callback=cb)
 x      = hcat(sol(t)...)
 u      = u0[:,1:N]
@@ -98,7 +98,7 @@ gui()
 # Validation data. Simulate system again with different input trajectory
 uv   = torque(q,qd,qdd)
 uv .+= 0.1randn(size(uv))
-prob   = OrdinaryDiffEq.ODEProblem((x,p,t)->time_derivative(x, uv[:,floor(Int,t/h)+1]),q0,(t[[1,end]]...))
+prob   = OrdinaryDiffEq.ODEProblem((x,p,t)->time_derivative(x, uv[:,floor(Int,t/h)+1]),q0,(t[[1,end]]...,))
 sol   = solve(prob,Tsit5(),reltol = 1e-8,abstol = 1e-8, callback = cb)
 xv    = hcat(sol(t)...)
 uv    = uv[:,1:N]

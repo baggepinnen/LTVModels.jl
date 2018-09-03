@@ -366,7 +366,7 @@ function fit_statespace_admm!(model::AbstractModel,x,u,lambda;
             end
         end
         if nAxz < tol
-            info("||Ax-z||₂ ≤ tol")
+            @info("||Ax-z||₂ ≤ tol")
             break
         end
     end
