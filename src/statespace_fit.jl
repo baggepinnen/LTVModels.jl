@@ -1,5 +1,5 @@
 export fit_statespace, fit_statespace_gd, fit_statespace_constrained, fit_statespace_gd!, fit_statespace_jump!
-using ProximalOperators
+using ProximalOperators, SparseArrays, LinearAlgebra
 # function fit_statespace(x,u,lambda; normType = 2, D = 2, solver=:ECOS, kwargs...)
 #     y,A  = matrices(x,u)
 #     n,T  = size(x)
@@ -211,12 +211,12 @@ function matrices2(x,u)
     m = size(u,1)
     y = x[:,2:end]
     A = spzeros(T*n, n^2+n*m)
-    I = speye(n)
+    Is = sparse(1.0I,n,n)
     for i = 1:T
         ii = (i-1)*n+1
         ii2 = ii+n-1
-        A[ii:ii2,1:n^2] = kron(I,x[:,i]')
-        A[ii:ii2,n^2+1:end] = kron(I,u[:,i]')
+        A[ii:ii2,1:n^2] = kron(Is,x[:,i]')
+        A[ii:ii2,n^2+1:end] = kron(Is,u[:,i]')
     end
     y,A
 end
@@ -275,8 +275,8 @@ function fit_statespace_admm!(model::AbstractModel,x,u,lambda;
     zeroinit   = false,
     cb         = nothing,
     λ          = 0.05,
-    μ          = λ/4/D^2/(ridge == 0 ? 1 : 2), # 32 is the biggest possible ||A||₂²
     ridge      = 0,
+    μ          = λ/4/D^2/(ridge == 0 ? 1 : 2), # 32 is the biggest possible ||A||₂²
     kwargs...)
 
 
@@ -288,7 +288,7 @@ function fit_statespace_admm!(model::AbstractModel,x,u,lambda;
     m       = size(u,1)
     NK      = length(k)
     x       = !zeroinit*copy(k[:])
-    A       = speye(NK)
+    A       = sparse(1.0I,NK,NK)
     if D == 1
         normA2 = ridge > 0 ? 2*3.91 : 3.91
         z       = !zeroinit*diff(k,2)[:]

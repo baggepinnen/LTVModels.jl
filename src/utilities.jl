@@ -53,17 +53,17 @@ function matrices(x,u)
     m = size(u,1)
     A = spzeros(T*n, n^2+n*m)
     y = zeros(T*n)
-    I = speye(n)
+    Is = sparse(1.0I,n,n)
     for i = 1:T
         ii = (i-1)*n+1
         ii2 = ii+n-1
-        A[ii:ii2,1:n^2] = kron(I,x[:,i]')
-        A[ii:ii2,n^2+1:end] = kron(I,u[:,i]')
+        A[ii:ii2,1:n^2] = kron(Is,x[:,i]')
+        A[ii:ii2,n^2+1:end] = kron(Is,u[:,i]')
         y[ii:ii2] = (x[:,i+1])
     end
     y,A
 end
-flatten(A) = reshape(A,prod(size(A,1,2)),size(A,3))'
+flatten(A) = reshape(A,prod(size(A)[1:2]),size(A,3))'
 flatten(model::LTVStateSpaceModel) = [flatten(model.At) flatten(model.Bt)]
 decayfun(iters, reduction) = reduction^(1/iters)
 

@@ -1,4 +1,4 @@
-if !isdefined(:AbstractModel)
+if !@isdefined(AbstractModel)
     include(Pkg.dir("DifferentialDynamicProgramming","src","interfaces.jl"))
 end
 

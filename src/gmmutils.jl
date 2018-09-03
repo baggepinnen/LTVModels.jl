@@ -264,7 +264,7 @@ function fit_dynamics_decoupled(y, x, u; λ = 1e-7)
     n   = d + size(u,2)
     for i = 1:d
         A     = [x[:,i] u[:,i]]
-        G     = [A; λ*eye(n)]
+        G     = [A; λ*I]
         w[[i,i+d],i]     = G\[y[:,i]; zeros(n)]
     end
     ŷ  = A*w
