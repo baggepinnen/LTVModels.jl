@@ -1,4 +1,4 @@
-if !isdefined(:AbstractModel)
+if !@isdefined(AbstractModel)
     include(Pkg.dir("DifferentialDynamicProgramming","src","interfaces.jl"))
 end
 
@@ -69,7 +69,7 @@ function GMMModel(model::GMMModel, x,u, xnew, K;
     model.T        = T
     yhat = predict(model, x,u)
     fit = nrmse(xnew,yhat)
-    println("Modelfit: ", round(fit,3))
+    println("Modelfit: ", round(fit, digits=3))
     return model
 end
 

@@ -1,7 +1,8 @@
 using LTVModels
-using Base.Test
+using Test, LinearAlgebra, Statistics, Random
 using Plots
 
+eye(n) = Matrix{Float64}(I,n,n)
 function test_kalmanmodel(T = 10000)
 
     A,B,x,u,n,m,N = LTVModels.testdata(T=T, σ_state_drift=0.001, σ_param_drift=0.001)

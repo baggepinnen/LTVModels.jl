@@ -3,7 +3,7 @@ using Distributions
 using PDMats
 import Base.LinAlg.Cholesky
 
-type SingularGMM
+mutable struct SingularGMM
     K::Int
     D::Int
     μ::Matrix{Float64}
@@ -12,7 +12,7 @@ type SingularGMM
     SingularGMM(K,D) = new(K,D,zeros(K,D),Matrix{Float64}[zeros(D,D) for i=1:K], zeros(K))
 end
 
-type LinearDynamics
+mutable struct LinearDynamics
     μ::Vector{Float64}
     Σ::Matrix{Float64}
     fx::Matrix{Float64}
@@ -20,7 +20,7 @@ type LinearDynamics
 end
 LinearDynamics(d::Int) = LinearDynamics(zeros(d),zeros(d,d),zeros(d,d),zeros(d,d))
 
-type AffineTransform
+mutable struct AffineTransform
     U::Matrix{Float64}
     xmin::Vector{Float64}
     xmax::Vector{Float64}
@@ -79,7 +79,7 @@ function fit_good_model(X, K, nTries)
         end
         itworked == 10 && error("Better luck another time")
     end
-    model = models[indmax([avll(models[i],X') for i = 1:nTries])]
+    model = models[argmax([avll(models[i],X') for i = 1:nTries])]
 end
 
 """
@@ -103,7 +103,7 @@ function get_assignments(model::GMM, X)
     ass = findmax(Q,2)[2][:]
     ass = [ind2sub(Q,a)[2] for a in ass][:]
     if N >= K
-        1:K ⊆ ass || warn("Not all clusters have data points assigned to them")
+        1:K ⊆ ass || @warn("Not all clusters have data points assigned to them")
     end
     return Q,ass
 end
@@ -124,7 +124,7 @@ function get_assignments_robust(model::GMM, X)
             μ = vec(model.μ[k,:]')
             Q[k] = model.w[k]*logpdf(MvNormal(μ, Σ[k]),vec(X[:,n]))
         end
-        ass[n] = indmax(Q)
+        ass[n] = argmax(Q)
     end
     return ass
 end
@@ -163,7 +163,7 @@ function conditionalGMM(M, d, p, T)
         Mc.μ[k,:]  = (μ[Sl] + J[k]*(pr - μ[Sr]))'
         Mc.Σ[k]    =  Σ[Sl,Sl] - J[k]*Σ[Sr,Sl]
         # J[k]     = Tl.U*A*Tr.U'
-        warn("Have not yet considered scaling by Xmax")
+        @warn("Have not yet considered scaling by Xmax")
         f[k] = fN(vec(M.μ[k,Sr]), M.Σ[k][Sr,Sr], pr, regul)[1]
         Q[k] = M.w[k]*f[k]
     end
@@ -264,7 +264,7 @@ function fit_dynamics_decoupled(y, x, u; λ = 1e-7)
     n   = d + size(u,2)
     for i = 1:d
         A     = [x[:,i] u[:,i]]
-        G     = [A; λ*eye(n)]
+        G     = [A; λ*I]
         w[[i,i+d],i]     = G\[y[:,i]; zeros(n)]
     end
     ŷ  = A*w

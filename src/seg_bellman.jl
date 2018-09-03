@@ -155,7 +155,7 @@ end
 function benchmark_const(N, M=1, doplot=false)
     doplot = @static isinteractive() && doplot
     n = 3N
-    y = [0.1randn(N); 10+0.1randn(N); 20+0.1randn(N)+linspace(1,10,N)]
+    y = [0.1randn(N); 10+0.1randn(N); 20+0.1randn(N)+range(1, stop=10, length=N)]
     V,t,a = @time seg_bellman(y,M, ones(y))
     if doplot
         tplot = [1;t;n];
@@ -171,7 +171,7 @@ function benchmark_lin(T_, M, doplot=false)
 
     # M        = 1
     # T_       = 400
-    x = sin.(linspace(0,2π,T_))
+    x = sin.(range(0, stop=2π, length=T_))
     input = matrices(x,ones(x))
     @time V,t,a = seg_bellman(input,M, ones(T_-1), cost_lin, argmin_lin, doplot=false)
     if doplot

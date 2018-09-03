@@ -13,7 +13,7 @@ aic(x::AbstractVector,d) = log(sse(x)) + 2d/size(x,2)
 
 Returns a Toeplitz matrix where `c` is the first column and `r` is the first row.
 """
-function toeplitz{T}(c::AbstractVector{T},r::AbstractVector{T})
+function toeplitz(c::AbstractVector{T},r::AbstractVector{T}) where T
     nc = length(c)
     nr = length(r)
     A = zeros(T, nc, nr)
@@ -53,17 +53,17 @@ function matrices(x,u)
     m = size(u,1)
     A = spzeros(T*n, n^2+n*m)
     y = zeros(T*n)
-    I = speye(n)
+    Is = sparse(1.0I,n,n)
     for i = 1:T
         ii = (i-1)*n+1
         ii2 = ii+n-1
-        A[ii:ii2,1:n^2] = kron(I,x[:,i]')
-        A[ii:ii2,n^2+1:end] = kron(I,u[:,i]')
+        A[ii:ii2,1:n^2] = kron(Is,x[:,i]')
+        A[ii:ii2,n^2+1:end] = kron(Is,u[:,i]')
         y[ii:ii2] = (x[:,i+1])
     end
     y,A
 end
-flatten(A) = reshape(A,prod(size(A,1,2)),size(A,3))'
+flatten(A) = reshape(A,prod(size(A)[1:2]),size(A,3))'
 flatten(model::LTVStateSpaceModel) = [flatten(model.At) flatten(model.Bt)]
 decayfun(iters, reduction) = reduction^(1/iters)
 
@@ -137,7 +137,7 @@ end
 Create an LTVModel with Brownian-walk A[t] and B[t]
 """
 function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
-    srand(1)
+    Random.seed!(1)
     n           = 3
     m           = 2
     T           = 10000
@@ -166,7 +166,7 @@ Create an LTVModel that changes from `A = [0.95 0.1; 0 0.95]` to `A = [0.5 0.05;
 at T÷2
 """
 function testdata(T_)
-    srand(1)
+    Random.seed!(1)
 
     n,m      = 2,1
     At_      = [0.95 0.1; 0 0.95]
@@ -223,7 +223,7 @@ mutable struct ADAMOptimizer{T, VecType <: AbstractArray}
     v::VecType
 end
 
-ADAMOptimizer{T,VecType <: AbstractArray}(Θ::VecType; α::T = 0.005,  β1::T = 0.9, β2::T = 0.999, ɛ::T = 1e-8, m=zeros(Θ), v=zeros(Θ)) = ADAMOptimizer{T,VecType}(Θ, α,  β1, β2, ɛ, m, v)
+ADAMOptimizer(Θ::VecType; α::T = 0.005,  β1::T = 0.9, β2::T = 0.999, ɛ::T = 1e-8, m=zeros(Θ), v=zeros(Θ)) where {T,VecType <: AbstractArray} = ADAMOptimizer{T,VecType}(Θ, α,  β1, β2, ɛ, m, v)
 
 """
     (a::ADAMOptimizer{T,VecType})(g::VecType, t::Integer)
