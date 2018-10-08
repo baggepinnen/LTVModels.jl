@@ -198,7 +198,7 @@ struct RMSpropOptimizer{VecType}
 end
 
 function RMSpropOptimizer(Θ, α, rmspropfactor=0.8, momentum=0.1)
-    RMSpropOptimizer(α, rmspropfactor, momentum, Θ, ones(Θ), zeros(Θ))
+    RMSpropOptimizer(α, rmspropfactor, momentum, Θ, ones(size(Θ)), zeros(size(Θ)))
 end
 
 function (opt::RMSpropOptimizer)(dΘ)
@@ -223,7 +223,7 @@ mutable struct ADAMOptimizer{T, VecType <: AbstractArray}
     v::VecType
 end
 
-ADAMOptimizer(Θ::VecType; α::T = 0.005,  β1::T = 0.9, β2::T = 0.999, ɛ::T = 1e-8, m=zeros(Θ), v=zeros(Θ)) where {T,VecType <: AbstractArray} = ADAMOptimizer{T,VecType}(Θ, α,  β1, β2, ɛ, m, v)
+ADAMOptimizer(Θ::VecType; α::T = 0.005,  β1::T = 0.9, β2::T = 0.999, ɛ::T = 1e-8, m=zeros(size(Θ)), v=zeros(size(Θ))) where {T,VecType <: AbstractArray} = ADAMOptimizer{T,VecType}(Θ, α,  β1, β2, ɛ, m, v)
 
 """
     (a::ADAMOptimizer{T,VecType})(g::VecType, t::Integer)

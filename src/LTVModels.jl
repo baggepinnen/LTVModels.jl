@@ -14,7 +14,7 @@ export KalmanModel, GMMModel
 using DSP, Plots, Juno#, Convex, FirstOrderSolvers
 using Test
 
-using DiffBase
+using DiffResults
 using ReverseDiff: GradientTape, GradientConfig, gradient!
 
 """
