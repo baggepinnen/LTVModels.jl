@@ -221,9 +221,10 @@ mutable struct ADAMOptimizer{T, VecType <: AbstractArray}
     ɛ::T
     m::VecType
     v::VecType
+    expdecay::Float64
 end
 
-ADAMOptimizer(Θ::VecType; α::T = 0.005,  β1::T = 0.9, β2::T = 0.999, ɛ::T = 1e-8, m=zeros(size(Θ)), v=zeros(size(Θ))) where {T,VecType <: AbstractArray} = ADAMOptimizer{T,VecType}(Θ, α,  β1, β2, ɛ, m, v)
+ADAMOptimizer(Θ::VecType; α::T = 0.005,  β1::T = 0.9, β2::T = 0.999, ɛ::T = 1e-8, m=zeros(size(Θ)), v=zeros(size(Θ)), expdecay=0) where {T,VecType <: AbstractArray} = ADAMOptimizer{T,VecType}(Θ, α,  β1, β2, ɛ, m, v, expdecay)
 
 """
     (a::ADAMOptimizer{T,VecType})(g::VecType, t::Integer)
@@ -235,9 +236,9 @@ function (a::ADAMOptimizer)(g, t::Integer)
     mul2 = (1-a.β2)
     div  = 1/(1 - a.β1 ^ t)
     div2 = 1/(1 - a.β2 ^ t)
-    α,β1,β2,ɛ,m,v,Θ = a.α,a.β1,a.β2,a.ɛ,a.m,a.v,a.Θ
+    α,β1,β2,ɛ,m,v,Θ,γ = a.α,a.β1,a.β2,a.ɛ,a.m,a.v,a.Θ,a.expdecay
     Base.Threads.@threads for i = 1:length(g)
-        @inbounds m[i] = β1 * m[i] + mul * g[i]
+        @inbounds m[i] = β1 * m[i] + mul * (g[i] + γ*Θ[i])
         @inbounds v[i] = β2 * v[i] + mul2 * g[i]^2
         @inbounds Θ[i] -= α * m[i] * div / (sqrt(v[i] * div2) + ɛ)
     end
