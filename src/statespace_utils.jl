@@ -13,7 +13,7 @@ If `t` is provided, use model at time `t` to predict a single output only.
 function predict(model::LTVStateSpaceModel, x, u)
     n,T  = size(x)
     @assert T<=length(model) "Can not predict further than the number of time steps in the model"
-    xnew = Array{eltype(x)}(n,T)
+    xnew = Array{eltype(x)}(undef,n,T)
     @views for t = 1:T
         xnew[:,t] = (model.At[:,:,t] * x[:,t] + model.Bt[:,:,t] * u[:,t])'
     end
@@ -35,7 +35,7 @@ function simulate(model::LTVStateSpaceModel, x0, u)
     n = size(model.At,1)
     @assert T > n "The calling convention for u is that time is the second dimention (n,T = size(u))"
     @assert T<=length(model) "Can not simulate further than the number of time steps in the model"
-    x = Array{eltype(u)}(n,T)
+    x = Array{eltype(u)}(undef,n,T)
     x[:,1] = x0
     @views for t = 1:T-1
         x[:,t+1] = model.At[:,:,t] * x[:,t] + model.Bt[:,:,t] * u[:,t]

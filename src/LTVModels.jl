@@ -31,9 +31,9 @@ mutable struct KalmanModel{T} <: LTVStateSpaceModel
 end
 function KalmanModel(At::Array{T,3},Bt::Array{T,3},Pt::Array{T,3},extend::Bool) where T
     if extend
-        At = cat(3,At,At[:,:,end])
-        Bt = cat(3,Bt,Bt[:,:,end])
-        Pt = cat(3,Pt,Pt[:,:,end])
+        At = cat(At,At[:,:,end], dims=3)
+        Bt = cat(Bt,Bt[:,:,end], dims=3)
+        Pt = cat(Pt,Pt[:,:,end], dims=3)
     end
     return KalmanModel{T}(At,Bt,Pt,extend)
 end

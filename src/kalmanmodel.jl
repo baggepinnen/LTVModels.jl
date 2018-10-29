@@ -7,7 +7,7 @@ end
 # TODO: predict with covariacne (filter). This should include both model covariacne and state covariance for kalman models
 # TODO: Enable imposing of known structure with e.g. a boolean matrix and a coefficient matrix to tell the algorithm which entries are known to be ==1, ==0, ==h etc.
 # Use this matrix to either set some values in C, xkn, Pkn, At,Bt to zero
-
+eye(n) = Matrix{Float64}(I,n,n)
 function KalmanModel(model::KalmanModel, xi,u,R1,R2, P0=100R1; extend=false, printfit=true)::KalmanModel
     x,u,xnew = xi[:,1:end-1],u[:,1:end-1],xi[:,2:end]
     n,T = size(x)
@@ -29,14 +29,14 @@ function KalmanModel(model::KalmanModel, xi,u,R1,R2, P0=100R1; extend=false, pri
     @views if extend # Extend model one extra time step (primitive way)
         model.At[:,:,end] .= model.At[:,:,end-1]
         model.Bt[:,:,end] .= model.Bt[:,:,end-1]
-        Pkn = cat(3,Pkn, Pkn[:,:,end])
+        Pkn = cat(Pkn, Pkn[:,:,end], dims=3)
     end
     model.extended = extend
     model.Pt = Pkn
     if printfit
         yhat = predict(model, x,u)
         fit = nrmse(xnew,yhat)
-        println("Modelfit: ", round.(fit,3))
+        println("Modelfit: ", round.(fit,digits=3))
     end
 
     return model
@@ -116,7 +116,7 @@ function forward_kalman(y,C,R1,R2, P0)
         data_to_use = 1:min(2n, size(y,2))
         xkk[ran,1]    = C[i+1,ran,data_to_use]'\y[i+1,data_to_use]  # Initialize to semi-global ls solution
     end
-    copy!(@view(Pkk[:,:,1]), P0)
+    Pkk[:,:,1] .= P0
     xk         = copy(xkk)
     Pk         = copy(Pkk)
     i          = 1
