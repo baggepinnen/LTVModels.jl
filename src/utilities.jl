@@ -236,7 +236,7 @@ function (a::ADAMOptimizer)(g, t::Integer)
     div  = 1/(1 - a.β1 ^ t)
     div2 = 1/(1 - a.β2 ^ t)
     α,β1,β2,ɛ,m,v,Θ = a.α,a.β1,a.β2,a.ɛ,a.m,a.v,a.Θ
-    Base.Threads.@threads for i = 1:length(g)
+    Base.Threads.@threads for i = eachindex(g)
         @inbounds m[i] = β1 * m[i] + mul * g[i]
         @inbounds v[i] = β2 * v[i] + mul2 * g[i]^2
         @inbounds Θ[i] -= α * m[i] * div / (sqrt(v[i] * div2) + ɛ)
