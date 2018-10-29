@@ -3,10 +3,10 @@ export toeplitz, toOrthoNormal, flatten, activation, segmentplot, rms, modelfit
 rms(x::AbstractVector) = sqrt(mean(abs2,x))
 sse(x::AbstractVector) = x⋅x
 
-rms(x::AbstractMatrix) = sqrt.(mean(abs2.(x),2))[:]
-sse(x::AbstractMatrix) = sum(abs2,x,2)[:]
-modelfit(y,yh) = 100 * (1-rms(y.-yh)./rms(y.-mean(y)))
-aic(x::AbstractVector,d) = log(sse(x)) + 2d/size(x,2)
+rms(x::AbstractMatrix) = sqrt.(mean(abs2.(x),dims=2))[:]
+sse(x::AbstractMatrix) = sum(abs2,x,dims=2)[:]
+modelfit(y,yh) = 100 * (1 .-rms(y.-yh)./rms(y.-mean(y)))
+aic(x::AbstractVector,d) = log(sse(x)) .+ 2d/size(x,2)
 
 """
     toeplitz{T}(c::AbstractArray{T},r::AbstractArray{T})
@@ -238,7 +238,7 @@ function (a::ADAMOptimizer)(g, t::Integer)
     div2 = 1/(1 - a.β2 ^ t)
     α,β1,β2,ɛ,m,v,Θ,γ = a.α,a.β1,a.β2,a.ɛ,a.m,a.v,a.Θ,a.expdecay
     γ *= t > 5
-    Base.Threads.@threads for i = 1:length(g)
+    Base.Threads.@threads for i = eachindex(g)
         @inbounds m[i] = β1 * m[i] + mul * (g[i] + γ*Θ[i])
         @inbounds v[i] = β2 * v[i] + mul2 * g[i]^2
         @inbounds Θ[i] -= α * m[i] * div / (sqrt(v[i] * div2) + ɛ)
