@@ -4,7 +4,7 @@ using LTVModelsBase
 import LTVModelsBase: AbstractModel, AbstractCost, ModelAndCost, f,
 dc,calculate_cost,calculate_final_cost,
 predict, simulate, df,costfun, LTVStateSpaceModel,
-SimpleLTVModel
+SimpleLTVModel, rms, sse, nrmse, modelfit, aic
 
 export predict, simulate
 
