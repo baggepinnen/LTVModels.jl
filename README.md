@@ -60,21 +60,23 @@ Code to fit a model by solving (7) using a Kalman smoother:
 
 The code generates an LTV model `A[t], B[t]` and time series `x,u` governed by the model. A model is then fit using a Kalman smoother and the true model coefficients as well as the estimated are plotted. The gif below illustrates how the choice of covariance parameter influences the estimated time-evolution of the model parameters. As `R2`→∞, the result approaches that of standard least-squares estimation of an LTI model.
 ```julia
-using LTVModels, Plots
+using LTVModels, Plots, LinearAlgebra
 T = 2_000
 A,B,x,u,n,m,N = LTVModels.testdata(T=T, σ_state_drift=0.001, σ_param_drift=0.001)
 
 gr(size=(400,300))
-anim = @animate for r2 = logspace(-3,3,10)
+eye(n) = Matrix{Float64}(I,n,n)
+anim = @animate for r2 = exp10.(range(-3, stop=3, length=10))
     R1          = 0.001*eye(n^2+n*m)
     R2          = r2*eye(n)
     P0          = 10000R1
     model = KalmanModel(copy(x),copy(u),R1,R2,P0,extend=true)
 
     plot(flatten(A), l=(2,), xlabel="Time index", ylabel="Model coefficients", lab="True", c=:red)
-    plot!(flatten(model.At), l=(2,), lab="Estimated", c=:blue)
+    plot!(flatten(model.At), l=(2,), lab="Estimated", c=:blue, legend=false)
 end
 gif(anim, "kalman.gif", fps = 5)
+
 ```
 ![window](figures/kalman.gif)
 

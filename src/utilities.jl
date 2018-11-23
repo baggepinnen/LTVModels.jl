@@ -22,7 +22,7 @@ end
 function toOrthoNormal(Ti)
     local T = deepcopy(Ti)
     U_,S_,V_ = svd(T[1:3,1:3])
-    local R = U_*diagm([1,1,sign(det(U_*V_'))])*V_'
+    local R = U_*diagm(0=>[1,1,sign(det(U_*V_'))])*V_'
     T[1:3,1:3] = R
     return T
 end
@@ -133,13 +133,12 @@ function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
     Random.seed!(1)
     n           = 3
     m           = 2
-    T           = 10000
     N           = n*(n+m)
     A           = zeros(n,n,T)
     B           = zeros(n,m,T)
     x           = zeros(n,T)
     u           = randn(m,T)
-    U,S,V       = ⟂(randn(n,n)), diagm(0.4rand(n)), ⟂(randn(n,n))
+    U,S,V       = ⟂(randn(n,n)), diagm(0=>0.4rand(n)), ⟂(randn(n,n))
     A[:,:,1]    = U*S*V'
     B[:,:,1]    = 0.5randn(n,m)
     x[:,1]      = 0.1randn(n)
