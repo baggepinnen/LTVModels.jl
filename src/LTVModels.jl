@@ -1,5 +1,5 @@
 module LTVModels
-using LinearAlgebra, Statistics, Printf, Random
+using LinearAlgebra, Statistics, Printf, Random, Distributions
 using LTVModelsBase
 import LTVModelsBase: AbstractModel, AbstractCost, ModelAndCost, f,
 dc,calculate_cost,calculate_final_cost,
@@ -28,6 +28,7 @@ mutable struct KalmanModel{T} <: LTVStateSpaceModel
     Bt::Array{T,3}
     Pt::Array{T,3}
     extended::Bool
+    ll::Float64
 end
 function KalmanModel(At::Array{T,3},Bt::Array{T,3},Pt::Array{T,3},extend::Bool) where T
     if extend
@@ -35,10 +36,10 @@ function KalmanModel(At::Array{T,3},Bt::Array{T,3},Pt::Array{T,3},extend::Bool) 
         Bt = cat(Bt,Bt[:,:,end], dims=3)
         Pt = cat(Pt,Pt[:,:,end], dims=3)
     end
-    return KalmanModel{T}(At,Bt,Pt,extend)
+    return KalmanModel{T}(At,Bt,Pt,extend,0.0)
 end
 
-KalmanModel(At,Bt,Pt,extend::Bool=false) = KalmanModel{eltype(At)}(At,Bt,Pt,extend)
+KalmanModel(At,Bt,Pt,extend::Bool=false) = KalmanModel{eltype(At)}(At,Bt,Pt,extend,0.0)
 
 mutable struct GMMModel <: AbstractModel
     M

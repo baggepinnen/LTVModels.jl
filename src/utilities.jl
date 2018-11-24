@@ -129,8 +129,8 @@ end
 
 Create an LTVModel with Brownian-walk A[t] and B[t]
 """
-function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
-    Random.seed!(1)
+function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001, seed=1)
+    Random.seed!(seed)
     n           = 3
     m           = 2
     N           = n*(n+m)

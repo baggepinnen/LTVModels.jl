@@ -20,7 +20,8 @@ function KalmanModel(model::KalmanModel, xi,u,R1,R2, P0=100R1; extend=false, pri
     @views for t = 1:T
         C[:,:,t] = kron(eye(n),[x[:,t]; u[:,t]]')
     end
-    xkn, Pkn    = kalman_smoother(y, C, R1, R2, P0)
+    xkn, Pkn,ll    = kalman_smoother(y, C, R1, R2, P0)
+    model.ll = ll
     @views for t = 1:T
         ABt      = reshape(xkn[:,t],n+m,n)'
         model.At[:,:,t] .= ABt[:,1:n]
@@ -116,12 +117,14 @@ function forward_kalman(y,C,R1,R2, P0)
         data_to_use = 1:min(2n, size(y,2))
         xkk[ran,1]    = C[i+1,ran,data_to_use]'\y[i+1,data_to_use]  # Initialize to semi-global ls solution
     end
+    R2d = MvNormal(R2)
     Pkk[:,:,1] .= P0
     xk         = copy(xkk)
     Pk         = copy(Pkk)
     i          = 1
-    Ck         = @view C[:,:,i]
+    Ck         = C[:,:,i]
     e          = y[:,i]-Ck*xk[:,i]
+    ll         = logpdf(R2d,e)
     S          = Ck*Pk[:,:,i]*Ck' + R2
     K          = (Pk[:,:,i]*Ck')/S
     xkk[:,i]   = xk[:,i] + K*e
@@ -132,26 +135,27 @@ function forward_kalman(y,C,R1,R2, P0)
         xk[:,i]    = Ak*xkk[:,i-1]
         Pk[:,:,i]  = Ak*Pkk[:,:,i-1]*Ak' + R1
         e          = y[:,i]-Ck*xk[:,i]
+        ll        += logpdf(R2d,e)
         S          = Ck*Pk[:,:,i]*Ck' + R2
         K          = (Pk[:,:,i]*Ck')/S
         xkk[:,i]   = xk[:,i] + K*e
         Pkk[:,:,i] = (I - K*Ck)*Pk[:,:,i]
     end
 
-    return xkk,xk,Pkk,Pk
+    return xkk,xk,Pkk,Pk,ll
 end
 
 function kalman_smoother(y, C, R1, R2, P0)
-    T             = size(y,2)
-    xkk,xk,Pkk,Pk = forward_kalman(y,C,R1,R2, P0)
-    xkn           = similar(xkk)
-    Pkn           = similar(Pkk)
-    xkn[:,end]    = xkk[:,end]
-    Pkn[:,:,end]  = Pkk[:,:,end]
+    T                = size(y,2)
+    xkk,xk,Pkk,Pk,ll = forward_kalman(y,C,R1,R2, P0)
+    xkn              = similar(xkk)
+    Pkn              = similar(Pkk)
+    xkn[:,end]       = xkk[:,end]
+    Pkn[:,:,end]     = Pkk[:,:,end]
     @views for i = T-1:-1:1
         Ck          = Pkk[:,:,i]/Pk[:,:,i+1]
         xkn[:,i]    = xkk[:,i] + Ck*(xkn[:,i+1] - xk[:,i+1])
         Pkn[:,:,i]  = Pkk[:,:,i] + Ck*(Pkn[:,:,i+1] - Pk[:,:,i+1])*Ck'
     end
-    return xkn, Pkn
+    return xkn, Pkn,ll
 end
