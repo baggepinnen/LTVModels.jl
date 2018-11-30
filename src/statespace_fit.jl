@@ -280,7 +280,7 @@ function fit_statespace_admm!(model::AbstractModel,x,u,lambda;
     kwargs...)
 
 
-    k       = LTVModels.model2statevec(model)'
+    k       = LTVModels.model2statevec(model)' |> copy
     y, Φ    = LTVModels.matrices2(x,u)
     nparams = size(Φ,2)
     n,T     = size(x)
@@ -291,14 +291,14 @@ function fit_statespace_admm!(model::AbstractModel,x,u,lambda;
     A       = sparse(1.0I,NK,NK)
     if D == 1
         normA2 = ridge > 0 ? 2*3.91 : 3.91
-        z       = !zeroinit*diff(k,2)[:]
+        z       = !zeroinit*diff(k,dims=2)[:]
         for i = 1:NK-nparams
             A[i, i+nparams] = -1
         end
         A       = A[1:end-nparams,:]
     elseif D == 2
         normA2 = ridge > 0 ? 2*15.1 : 15.1
-        z       = !zeroinit*diff(diff(k,2),2)[:]
+        z       = !zeroinit*diff(diff(k,dims=2),2)[:]
         for i = 1:NK-nparams
             A[i, i+nparams] = -2
         end
@@ -314,7 +314,7 @@ function fit_statespace_admm!(model::AbstractModel,x,u,lambda;
         ii  = (t-1)*n+1
         ii2 = ii+n-1
         a   = Φ[ii:ii2,:]
-        Q   = full(a'a)
+        Q   = Matrix(a'a)
         q   = -a'y[:,t]
         ProximalOperators.QuadraticIterative(2Q,2q)
     end
@@ -346,11 +346,11 @@ function fit_statespace_admm!(model::AbstractModel,x,u,lambda;
     for i = 1:iters
 
         Axzu .= Axz.+u
-        At_mul_B!(proxf_arg,A,Axzu) # proxf_arg .= x - (μ/λ)*A'*Axzu
-        scale!(proxf_arg, -(μ/λ))
-        proxf_arg .+= x
+        proxf_arg .= -(μ/λ) .* A'Axzu .+ x # proxf_arg .= x - (μ/λ)*A'*Axzu
+        # proxf_arg .+= x
+
         prox!(x, proxf, proxf_arg, μ)
-        A_mul_B!(Ax,A,x) # Ax       .= A*x
+        Ax .= A*x # Ax       .= A*x
         proxg_arg .= Ax .+ u
         prox!(z, proxg, proxg_arg, λ)
         Axz .= Ax .- z
@@ -360,7 +360,7 @@ function fit_statespace_admm!(model::AbstractModel,x,u,lambda;
         if i % printerval == 0
             @printf("%d ||Ax-z||₂ %.6f\n", i,  nAxz)
             if cb != nothing
-                k = reshape(x,n*(n+m),T)'
+                k = reshape(x,n*(n+m),T)' |> copy
                 model = LTVModels.statevec2model(k,n,m,true)
                 cb(model)
             end
@@ -370,7 +370,7 @@ function fit_statespace_admm!(model::AbstractModel,x,u,lambda;
             break
         end
     end
-    k = reshape(x,nparams,T)'
+    k = reshape(x,nparams,T)' |> copy
     model = LTVModels.statevec2model(k,n,m,true)
     # plot(flatten(model))
     model
