@@ -1,7 +1,7 @@
 module LTVModels
 using LinearAlgebra, Statistics, Printf, Random, Distributions
-using LTVModelsBase
-import LTVModelsBase: AbstractModel, AbstractCost, ModelAndCost, f,
+using LinearTimeVaryingModelsBase
+import LinearTimeVaryingModelsBase: AbstractModel, AbstractCost, ModelAndCost, f,
 dc,calculate_cost,calculate_final_cost,
 predict, simulate, df,costfun, LTVStateSpaceModel,
 SimpleLTVModel, rms, sse, nrmse, modelfit, aic

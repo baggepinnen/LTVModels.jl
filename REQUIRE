@@ -1,5 +1,5 @@
 julia 0.7
-LTVModelsBase
+LinearTimeVaryingModelsBase
 ReverseDiff
 DSP
 ProximalOperators
