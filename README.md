@@ -24,8 +24,8 @@ This repository implements the system-identification methods presented in
 
 # Installation
 ```julia
-Pkg.clone("https://github.com/baggepinnen/LinearTimeVaryingModelsBase.jl")
-Pkg.clone("https://github.com/baggepinnen/LTVModels.jl")
+Pkg.add("https://github.com/baggepinnen/LinearTimeVaryingModelsBase.jl")
+Pkg.add("https://github.com/baggepinnen/LTVModels.jl")
 using LTVModels
 ```
 
