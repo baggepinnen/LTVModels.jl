@@ -8,12 +8,27 @@
 2018-03-14: More documentation and instructions to appear shortly. If you want to use this package before documentation is complete, feel free to open an issue and I'll help you out.
 
 This repository implements the system-identification methods presented in  
-[Bagge Carlson, F.](https://www.control.lth.se/Staff/FredrikBaggeCarlson.html), Robertsson, A. & Johansson, R. ["Identification of LTV Dynamical Models with Smooth or Discontinuous Time Evolution by means of Convex Optimization"](https://arxiv.org/abs/1802.09794) (IEEE ICCA 2018).
+[Bagge Carlson, F.](https://www.control.lth.se/staff/fredrik-bagge-carlson/), Robertsson, A. & Johansson, R. ["Identification of LTV Dynamical Models with Smooth or Discontinuous Time Evolution by means of Convex Optimization"](https://arxiv.org/abs/1802.09794) (IEEE ICCA 2018).
+[Bagge Carlson, F.](https://www.control.lth.se/staff/fredrik-bagge-carlson/), ["Machine Learning and System Identification for Estimation in Physical Systems"](https://lup.lub.lu.se/search/publication/ffb8dc85-ce12-4f75-8f2b-0881e492f6c0) (PhD Thesis 2018).
+```bibtex
+@thesis{bagge2018,
+  title        = {Machine Learning and System Identification for Estimation in Physical Systems},
+  author       = {Bagge Carlson, Fredrik},
+  keyword      = {Machine Learning,System Identification,Robotics,Spectral estimation,Calibration,State estimation},
+  month        = {12},
+  type         = {PhD Thesis},
+  number       = {TFRT-1122},
+  institution  = {Dept. Automatic Control, Lund University, Sweden},
+  year         = {2018},
+  url          = {},
+}
+```
+
 
 # Installation
 ```julia
-Pkg.clone("https://github.com/baggepinnen/LinearTimeVaryingModelsBase.jl")
-Pkg.clone("https://github.com/baggepinnen/LTVModels.jl")
+Pkg.add("https://github.com/baggepinnen/LinearTimeVaryingModelsBase.jl")
+Pkg.add("https://github.com/baggepinnen/LTVModels.jl")
 using LTVModels
 ```
 

@@ -29,7 +29,7 @@ function getARXregressor(y::AbstractVector,u::AbstractVecOrMat, na, nb)
     y    = copy(A[:,1])
     A    = A[:,2:end]
     for i = 1:length(nb)
-        offs = m-nb[i]
+        offs = m-nb[i]-1
         A = [A toeplitz(u[nb[i]+offs:n+nb[i]+offs-1,i],u[nb[i]+offs:-1:1+offs,i])]
     end
     return y,A
@@ -48,7 +48,7 @@ function getARXregressor(y::AbstractMatrix,u::AbstractVecOrMat, na::Number, nb)
         A = [A toeplitz(y[i,na+offs:n+na+offs-1],y[i,na+offs:-1:1+offs])]
     end
     for i = 1:length(nb)
-        offs = m-nb[i]
+        offs = m-nb[i]-1
         A = [A toeplitz(u[i,nb[i]+offs:n+nb[i]+offs-1],u[i,nb[i]+offs:-1:1+offs])]
     end
     return yo,A
