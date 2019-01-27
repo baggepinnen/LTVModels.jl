@@ -1,5 +1,3 @@
-export getARXregressor, find_na, arx, bodeconfidence
-
 """
     getARXregressor(y::AbstractVecOrMat,u::AbstractVecOrMat, na, nb)
 Returns a shortened output signal `y` and a regressor matrix `A` such that the least-squares ARX model estimate of order `na,nb` is `y\\A`
@@ -21,24 +19,25 @@ plot([yr A*x], lab=["Signal" "Prediction"])
 For nonlinear ARX-models, see [BasisFunctionExpansions.jl](https://github.com/baggepinnen/BasisFunctionExpansions.jl/)
 """
 function getARXregressor(y::AbstractVector,u::AbstractVecOrMat, na, nb)
-    assert(length(nb) == size(u,2))
-    m    = max(na+1,maximum(nb))
-    n    = length(y) - m+1
-    offs = m-na-1
-    A    = toeplitz(y[offs+na+1:n+na+offs],y[offs+na+1:-1:1])
-    y    = copy(A[:,1])
+    length(nb) == size(u,2) || throw(ArgumentError("Length of nb must equal number of input signals"))
+    m    = max(na,maximum(nb))+1 # Start of yr
+    @assert m >= 1
+    n    = length(y) - m + 1 # Final length of yr
+    @assert n <= length(y)
+    A    = toeplitz(y[m:m+n-1],y[m:-1:m-na])
+    @assert size(A,2) == na+1
+    y    = A[:,1] # extract yr
     A    = A[:,2:end]
     for i = 1:length(nb)
-        offs = m-nb[i]-1
-        A = [A toeplitz(u[nb[i]+offs:n+nb[i]+offs-1,i],u[nb[i]+offs:-1:1+offs,i])]
+        s = m-1
+        A = [A toeplitz(u[s:s+n-1,i],u[s:-1:s-nb[i]+1,i])]
     end
     return y,A
 end
-
 function getARXregressor(y::AbstractMatrix,u::AbstractVecOrMat, na::Number, nb)
     @assert length(nb) == size(u,1) "Length of nb must equal size(u,1)"
     # assert(length(na) == size(y,1), "Length of na must equal size(y,1)")
-    m    = max(na+1,maximum(nb))
+    m    = max(na,maximum(nb))+1
     n    = size(y,2) - m+1
     offs = m-na-1
     A    = Matrix{eltype(y)}(n,0)

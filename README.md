@@ -114,12 +114,5 @@ To appear
 
 [DifferentialDynamicProgramming.jl](https://github.com/baggepinnen/DifferentialDynamicProgramming.jl/tree/dev)
 
-## ARX estimation
-This repository provides some functions for estimation of ARX models.
-- `Gtf, Σ = arx(h, y, u, na, nb; λ = 0)`  
-Fit a transfer Function to data using an ARX model.
-`nb` and `na` are the orders of the numerator and denominator polynomials. `h` is the sample time.
-- `getARXregressor`
-- `find_na` Find suitable model order
-- `parameter_covariance`
-- `bodeconfidence` Plot a bode diagram including confidence intervals
+## LTI estimation
+Estimation of standard LTI systems is provided by [ControlSystemIdentification.jl](https://github.com/baggepinnen/ControlSystemIdentification.jl) 
