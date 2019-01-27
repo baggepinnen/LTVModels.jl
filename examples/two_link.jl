@@ -70,9 +70,9 @@ plot!([1,N],[wall, wall], l=(:dash, :black), grid=false, subplot=1, lab="Wall")
 plot!(u', subplot=2, title="Control torques")
 
 # Normalize input data to mean 0 and unit variance
-sx = std(x,2)
+sx = std(x,dims=2)
 su = std(u[1:2,:])
-mx, mu = mean(x,2), mean(u[1:2,:],2)
+mx, mu = mean(x,dims=2), mean(u[1:2,:],dims=2)
 xt = (x.-mx) ./ sx
 ut = copy(u)
 ut[1:2,:] = (ut[1:2,:].-mu) ./ su

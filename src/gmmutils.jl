@@ -274,7 +274,7 @@ function fit_dynamics_decoupled(y, x, u; λ = 1e-7)
     fx = w[1:d,:]
     fu = w[d+1:2d,:]
     #     μ  = w[2d+1:end,:]
-    return LinearDynamics(vec(mean(ŷ,1)), Σ, fx, fu)
+    return LinearDynamics(vec(mean(ŷ,dims=1)), Σ, fx, fu)
 end
 
 # """
@@ -295,5 +295,5 @@ function fit_dynamics(y, x, u; λ = 1e-7)
     fu   = w[d+1:end,:]'
     # μ  = w[2d+1:end,:]
 
-    return LinearDynamics(vec(mean(ŷ,1)), Σ, fx, fu)
+    return LinearDynamics(vec(mean(ŷ,dims=1)), Σ, fx, fu)
 end

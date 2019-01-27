@@ -65,7 +65,7 @@ function fit_statespace_gd!(model::AbstractModel,x,u,lambda; normType = 1, D = 1
     n,T     = size(x)
     T      -= 1
     m       = size(u,1)
-    diff_fun = D == 2 ? x-> diff(diff(x,1),1) : x-> diff(x,1)
+    diff_fun = D == 2 ? x-> diff(diff(x,dims=1),dims=1) : x-> diff(x,dims=1)
     function lossfun(k2)
         loss    = 0.
         for i = 1:T
@@ -75,12 +75,12 @@ function fit_statespace_gd!(model::AbstractModel,x,u,lambda; normType = 1, D = 1
         end
         NK = length(k2)
         if normType == 1
-            loss += lambda^2/NK*sum( sqrt.(sum(diff_fun(k2./std(k2,1)).^2, 2)) )
+            loss += lambda^2/NK*sum(sqrt,sum(diff_fun(k2./std(k2,dims=1)).^2, dims=2) )
         else
             loss += lambda/NK*sum(diff_fun(k2).^2)
         end
         if lasso > 0
-            loss += lasso^2*sum(abs.(k2))
+            loss += lasso^2*sum(abs, k2)
         end
         loss
     end
@@ -147,7 +147,7 @@ function fit_statespace_jump!(model::AbstractModel,x,u,lambda; normType = 1, D =
     T            -= 1
     m             = size(u,1)
     NK            = length(k)
-    diff_fun      = D == 2 ? x-> diff(diff(x,1),1) : x-> diff(x,1)
+    diff_fun      = D == 2 ? x-> diff(diff(x,dims=1),dims=1) : x-> diff(x,dims=1)
     # model = Model(IpoptSolver())
     # model         = Model(solver=SCSSolver(
     #     max_iters = 40000,

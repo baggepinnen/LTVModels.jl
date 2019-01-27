@@ -102,12 +102,12 @@ end
 
 activation(model::LTVStateSpaceModel; kwargs...) = activation(model.At,model.Bt; kwargs...)
 function activation(At,Bt; normalize=false)
-    diffparams = (diff([flatten(At) flatten(Bt)],1)).^2
+    diffparams = (diff([flatten(At) flatten(Bt)],dims=1)).^2
     if normalize
         diffparams .-= minimum(diffparams,1)
         diffparams ./= maximum(diffparams,1)
     end
-    activation = sqrt.(sum(diffparams,2)[:])
+    activation = sqrt.(sum(diffparams,dims=2)[:])
     activation
 end
 

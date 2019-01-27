@@ -141,8 +141,8 @@ bodeconfidence
     end
     magmc      = hcat(getindex.(res,1)...)
     phasemc    = hcat(getindex.(res,2)...)
-    mag        = mean(magmc,2)[:]
-    phase      = mean(phasemc,2)[:]
+    mag        = mean(magmc,dims=2)[:]
+    phase      = mean(phasemc,dims=2)[:]
     uppermag   = getpercentile(magmc,0.95)
     lowermag   = getpercentile(magmc,0.05)
     upperphase = getpercentile(phasemc,0.95)
@@ -173,7 +173,7 @@ bodeconfidence
 end
 
 function getpercentile(mag,p)
-    uppermag = mapslices(mag, 2) do magω
+    uppermag = mapslices(mag, dims=2) do magω
         sort(magω)[round(Int,endof(magω)*p)]
     end
 end
