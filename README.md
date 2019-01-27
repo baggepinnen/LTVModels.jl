@@ -1,6 +1,9 @@
 # LTVModels
 
 [![Build Status](https://travis-ci.org/baggepinnen/LTVModels.jl.svg?branch=master)](https://travis-ci.org/baggepinnen/LTVModels.jl)
+[![Coverage Status](https://coveralls.io/repos/github/baggepinnen/LTVModels.jl/badge.svg?branch=master)](https://coveralls.io/github/baggepinnen/LTVModels.jl?branch=master)
+[![codecov](https://codecov.io/gh/baggepinnen/LTVModels.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/baggepinnen/LTVModels.jl)
+
 
 2018-03-14: More documentation and instructions to appear shortly. If you want to use this package before documentation is complete, feel free to open an issue and I'll help you out.
 
