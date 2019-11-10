@@ -155,7 +155,7 @@ end
 function benchmark_const(N, M=1, doplot=false)
     doplot = @static isinteractive() && doplot
     n = 3N
-    y = [0.1randn(N); 10+0.1randn(N); 20+0.1randn(N)+range(1, stop=10, length=N)]
+    y = [0.1randn(N); 10.0 .+0.1randn(N); 20.0 .+0.1randn(N)+range(1, stop=10, length=N)]
     V,t,a = @time seg_bellman(y,M, ones(y))
     if doplot
         tplot = [1;t;n];
