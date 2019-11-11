@@ -1,11 +1,8 @@
 # LTVModels
 
 [![Build Status](https://travis-ci.org/baggepinnen/LTVModels.jl.svg?branch=master)](https://travis-ci.org/baggepinnen/LTVModels.jl)
-[![Coverage Status](https://coveralls.io/repos/github/baggepinnen/LTVModels.jl/badge.svg?branch=master)](https://coveralls.io/github/baggepinnen/LTVModels.jl?branch=master)
 [![codecov](https://codecov.io/gh/baggepinnen/LTVModels.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/baggepinnen/LTVModels.jl)
 
-
-2018-03-14: More documentation and instructions to appear shortly. If you want to use this package before documentation is complete, feel free to open an issue and I'll help you out.
 
 This repository implements the system-identification methods presented in  
 [Bagge Carlson, F.](https://www.control.lth.se/staff/fredrik-bagge-carlson/), Robertsson, A. & Johansson, R. ["Identification of LTV Dynamical Models with Smooth or Discontinuous Time Evolution by means of Convex Optimization"](https://arxiv.org/abs/1802.09794) (IEEE ICCA 2018).
@@ -27,7 +24,8 @@ This repository implements the system-identification methods presented in
 
 # Installation
 ```julia
-Pkg.add("https://github.com/baggepinnen/LinearTimeVaryingModelsBase.jl")
+using Pkg
+Pkg.add("LinearTimeVaryingModelsBase")
 Pkg.add("https://github.com/baggepinnen/LTVModels.jl")
 using LTVModels
 ```
@@ -41,7 +39,7 @@ and to reproduce Fig. 1 in the paper
 ```julia
 using LTVModels, Plots
 gr(size=(400,300))
-T_       = 400
+T_ = 400
 x,xm,u,n,m = LTVModels.testdata(T_)
 
 anim = Plots.Animation()
@@ -61,12 +59,12 @@ end
 gif(anim, "admm.gif", fps = 10)
 y = predict(model,x,u)
 e = x[:,2:end] - y[:,1:end-1]
-println("RMS error: ",rms(e))
+println("RMS error: ", LTVModels.rms(e))
 
 At,Bt = model.At,model.Bt
 plot(flatten(At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
-plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), l=(:dash,:black, 1))
-plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
+plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), l=(:dash,:black, 1), primary=false)
+plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false, primary=false)
 gui()
 ```
 ![window](figures/admm.gif)
@@ -115,4 +113,4 @@ To appear
 [DifferentialDynamicProgramming.jl](https://github.com/baggepinnen/DifferentialDynamicProgramming.jl/tree/dev)
 
 ## LTI estimation
-Estimation of standard LTI systems is provided by [ControlSystemIdentification.jl](https://github.com/baggepinnen/ControlSystemIdentification.jl) 
+Estimation of standard LTI systems is provided by [ControlSystemIdentification.jl](https://github.com/baggepinnen/ControlSystemIdentification.jl)
