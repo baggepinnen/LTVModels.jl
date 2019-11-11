@@ -84,7 +84,7 @@ function seg_bellman(y,M,w, costfun=cost_const, argminfun=argmin_const; doplot=f
     memorymat = fill(Inf,n,n)
 
     # iterate Bellman iteration
-    fnext = Vector{Float64}(n)
+    fnext = Vector{Float64}(undef,n)
     @progress for jj = M-1:-1:1
         for kk = jj:n-(M-jj)
             opt   = Inf
@@ -103,7 +103,7 @@ function seg_bellman(y,M,w, costfun=cost_const, argminfun=argmin_const; doplot=f
             B[jj,kk]  = optll-1
         end
         fi .= fnext
-        fnext = Vector{Float64}(n)
+        fnext = Vector{Float64}(undef,n)
         doplot && plot!(fi, lab="fi at $jj")
     end
 
@@ -115,8 +115,8 @@ function seg_bellman(y,M,w, costfun=cost_const, argminfun=argmin_const; doplot=f
     doplot && plot!(V, lab="V")
 
     # backward pass
-    t = Vector{Int}(M);
-    a = Vector{typeof(argminfun(y,w,1,2))}(M+1);
+    t = Vector{Int}(undef,M);
+    a = Vector{typeof(argminfun(y,w,1,2))}(undef,M+1);
     _,t[1] = findmin(V[1:end-M])
     a[1] = argminfun(y,w,1,t[1])
 
@@ -155,8 +155,8 @@ end
 function benchmark_const(N, M=1, doplot=false)
     doplot = @static isinteractive() && doplot
     n = 3N
-    y = [0.1randn(N); 10.0 .+0.1randn(N); 20.0 .+0.1randn(N)+range(1, stop=10, length=N)]
-    V,t,a = @time seg_bellman(y,M, ones(y))
+    y = [0.1randn(N); 10 .+ 0.1randn(N); 20 .+ 0.1randn(N).+range(1, stop=10, length=N)]
+    V,t,a = @time seg_bellman(y,M, ones(length(y)))
     if doplot
         tplot = [1;t;n];
         aplot = [a;a[end]];
@@ -175,10 +175,10 @@ function benchmark_lin(T_, M, doplot=false)
     input = matrices(x,ones(x))
     @time V,t,a = seg_bellman(input,M, ones(T_-1), cost_lin, argmin_lin, doplot=false)
     if doplot
-        k = hcat(a...)'
+        k = reduce(hcat, a)'
         At = reshape(k[:,1:n^2]',n,n,M+1)
         At = permutedims(At, [2,1,3])
-        tplot = [1;t;T_];
+        tplot = [1;t;T_]
         plot()
         for i = 1:M+1
             plot!(tplot[i:i+1],flatten(At)[i,:]'.*ones(2), c=[:blue :green :red :magenta], xlabel="Time index", ylabel="Model coefficients")
@@ -200,12 +200,12 @@ function benchmark_ss(T_, M, doplot=false)
 
     @time V,t,a = seg_bellman(input,M, ones(T_-1), cost_ss, argmin_ss, doplot=false)
     if doplot
-        k = hcat(a...)'
+        k = reduce(hcat, a)'
         At = reshape(k[:,1:n^2]',n,n,M+1)
         Bt = reshape(k[:,n^2+1:end]',m,n,M+1)
         At = permutedims(At, [2,1,3])
         Bt = permutedims(Bt, [2,1,3])
-        tplot = [1;t;T_];
+        tplot = [1;t;T_]
         plot()
         for i = 1:M+1
             plot!(tplot[i:i+1],flatten(At)[i,:]'.*ones(2), c=[:blue :green :red :magenta], xlabel="Time index", ylabel="Model coefficients")
