@@ -1,5 +1,6 @@
 export fit_statespace, fit_statespace_gd, fit_statespace_constrained, fit_statespace_gd!, fit_statespace_jump!
-using ProximalOperators, SparseArrays, LinearAlgebra
+using ProximalOperators, SparseArrays, LinearAlgebra, DiffResults
+
 # function fit_statespace(x,u,lambda; normType = 2, D = 2, solver=:ECOS, kwargs...)
 #     y,A  = matrices(x,u)
 #     n,T  = size(x)
@@ -87,8 +88,8 @@ function fit_statespace_gd!(model::AbstractModel,x,u,lambda; normType = 1, D = 1
     inputs      = (k,)
     loss_tape   = GradientTape(lossfun, inputs)
     results     = similar.(inputs)
-    all_results = DiffBase.GradientResult.(results)
-    mom         = zeros(k)
+    all_results = DiffResults.GradientResult.(results)
+    mom         = zeros(size(k))
     @show bestcost    = lossfun(k)
     costs       = Inf*ones(iters+1); costs[1] = bestcost
     steps       = zeros(iters)
@@ -103,18 +104,18 @@ function fit_statespace_gd!(model::AbstractModel,x,u,lambda; normType = 1, D = 1
         # opt(all_results[1].derivs[1])
         opt(all_results[1].derivs[1], iter)
         if iter % print_period == 0
-            println("Iteration: ", iter, " cost: ", round(costs[iter],6), " stepsize: ", step)
+            println("Iteration: ", iter, " cost: ", round(costs[iter],digits=6), " stepsize: ", step)
         end
         step *=  decay_rate
         opt.α = step
     end
 
     At,Bt = ABfromk(k,n,m,T)
-    SimpleLTVModel{eltype(At)}(At,Bt,extend),costs, steps
+    SimpleLTVModel(At,Bt,extend),costs, steps
 end
 
 function fit_statespace_constrained(x,u,changepoints::AbstractVector; extend=true)
-    y,A     = matrices(x,u)
+    y,A           = matrices(x,u)
     n,T           = size(x)
     m             = size(u,1)
     nc            = length(changepoints)

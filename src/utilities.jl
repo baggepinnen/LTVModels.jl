@@ -1,22 +1,4 @@
-export toeplitz, toOrthoNormal, flatten, activation, segmentplot, rms, modelfit
-
-
-"""
-    toeplitz{T}(c::AbstractArray{T},r::AbstractArray{T})
-
-Returns a Toeplitz matrix where `c` is the first column and `r` is the first row.
-"""
-function toeplitz(c::AbstractVector{T},r::AbstractVector{T}) where T
-    nc = length(c)
-    nr = length(r)
-    A = zeros(T, nc, nr)
-    A[:,1] = c
-    A[1,:] = r
-    @views for i in 2:nr
-        A[2:end,i] = A[1:end-1,i-1]
-    end
-    A
-end
+export toOrthoNormal, flatten, activation, segmentplot, rms, modelfit
 
 
 function toOrthoNormal(Ti)

@@ -99,24 +99,24 @@ function test_fit_statespace()
 
 
     # TODO: reenable tests below when figured out error with DiffBase
-    # model2, cost2, steps2 = fit_statespace_gd(xm,u,5000, normType = 1, D = 2, step=0.01, iters=10000, reduction=0.1, extend=true);
-    # y2 = predict(model2,x,u);
-    # At2,Bt2 = model2.At,model2.Bt
-    # e2 = x[:,2:end] - y2[:,1:end-1]
-    # println("RMS error: ",rms(e2))
-    # @static isinteractive() && plot(flatten(At2), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
-    # @static isinteractive() && plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
-    # @static isinteractive() && plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
-    #
-    #
-    # model2, cost2, steps2 = fit_statespace_gd(xm,u,1e10, normType = 2, D = 2, step=0.01, momentum=0.99, iters=10000, reduction=0.01, extend=true, lasso=1e-4);
-    # y2 = predict(model2,x,u);
-    # At2,Bt2 = model2.At,model2.Bt
-    # e2 = x[:,2:end] - y2[:,1:end-1]
-    # println("RMS error: ",rms(e2))
-    # @static isinteractive() && plot(flatten(At2), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
-    # @static isinteractive() && plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
-    # @static isinteractive() && plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
+    model2, cost2, steps2 = fit_statespace_gd(xm,u,5000, normType = 1, D = 2, step=0.01, iters=10000, reduction=0.1, extend=true);
+    y2 = predict(model2,x,u);
+    At2,Bt2 = model2.At,model2.Bt
+    e2 = x[:,2:end] - y2[:,1:end-1]
+    println("RMS error: ",rms(e2))
+    @static isinteractive() && plot(flatten(At2), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
+    @static isinteractive() && plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
+    @static isinteractive() && plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
+
+
+    model2, cost2, steps2 = fit_statespace_gd(xm,u,1e10, normType = 2, D = 2, step=0.01, momentum=0.99, iters=10000, reduction=0.01, extend=true, lasso=1e-4);
+    y2 = predict(model2,x,u);
+    At2,Bt2 = model2.At,model2.Bt
+    e2 = x[:,2:end] - y2[:,1:end-1]
+    println("RMS error: ",rms(e2))
+    @static isinteractive() && plot(flatten(At2), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
+    @static isinteractive() && plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
+    @static isinteractive() && plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
 
     rms(e)
 end

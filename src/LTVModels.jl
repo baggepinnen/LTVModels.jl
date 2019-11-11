@@ -1,6 +1,6 @@
 module LTVModels
 using LinearAlgebra, Statistics, Printf, Random, Distributions
-using LinearTimeVaryingModelsBase
+using LinearTimeVaryingModelsBase, ControlSystemIdentification
 import LinearTimeVaryingModelsBase: AbstractModel, AbstractCost, ModelAndCost, f,
 dc,calculate_cost,calculate_final_cost,
 predict, simulate, df,costfun, LTVStateSpaceModel,
@@ -48,7 +48,6 @@ mutable struct GMMModel <: AbstractModel
 end
 
 include("utilities.jl")
-include("arx.jl")
 include("peakdetection.jl")
 include("statespace_fit.jl")
 include("seg_bellman.jl")
