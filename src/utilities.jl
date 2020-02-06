@@ -22,13 +22,13 @@ function getD(D,T)
     error("Can not handle your choice of D: $D")
 end
 
-function matrices(x,u)
+function matrices(x::AbstractArray{FT},u) where FT
     n,T = size(x)
     T -= 1
     m = size(u,1)
-    A = spzeros(T*n, n^2+n*m)
-    y = zeros(T*n)
-    Is = sparse(1.0I,n,n)
+    A = spzeros(FT, T*n, n^2+n*m)
+    y = zeros(FT, T*n)
+    Is = sparse(FT(1.0)*I,n,n)
     for i = 1:T
         ii = (i-1)*n+1
         ii2 = ii+n-1

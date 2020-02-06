@@ -44,7 +44,7 @@ x,xm,u,n,m = LTVModels.testdata(T_)
 
 anim = Plots.Animation()
 function callback(m)
-    fig = plot(flatten(m.At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", show=true, ylims=(-0.05, 1))
+    fig = plot(LTVModels.flatten(m.At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", show=true, ylims=(-0.05, 1))
     frame(anim, fig)
 end
 
