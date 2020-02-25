@@ -1,35 +1,5 @@
-export fit_statespace, fit_statespace_gd, fit_statespace_constrained, fit_statespace_gd!, fit_statespace_jump!
+export fit_statespace, fit_statespace_gd, fit_statespace_constrained, fit_statespace_gd!
 using ProximalOperators, SparseArrays, LinearAlgebra, DiffResults
-
-# function fit_statespace(x,u,λ; normType = 2, D = 2, solver=:ECOS, kwargs...)
-#     y,A  = matrices(x,u)
-#     n,T  = size(x)
-#     T   -= 1
-#     m    = size(u,1)
-#
-#     Dx   = getD(D,T)
-#     k    = Convex.Variable(T,n^2+n*m)
-#
-#     loss = 0
-#     for i = 1:T
-#         ii = (i-1)*n+1
-#         ii2 = ii+n-1
-#         loss += Convex.sumsquares((y[:,ii:ii2]) - A[ii:ii2,:]*k[i,:]')
-#     end
-#     loss += λ*Convex.norm(Dx*k,normType)
-#     loss += Convex.sumsquares(k)
-#     problem = Convex.minimize(loss)
-#     if solver == :ECOS
-#         Convex.solve!(problem, ECOS.ECOSSolver(maxit=100, feastol=1e-10, feastol_inacc=1e-5, reltol=1e-09, abstol=1e-09, nitref=50))
-#     elseif solver == :Mattias
-#         Convex.solve!(problem, FirstOrderSolvers.LongstepWrapper(FirstOrderSolvers.GAPA(),max_iters=5000))
-#     else
-#         Convex.solve!(problem, SCS.SCSSolver(max_iters=100000, normalize=0, eps=1e-8))
-#     end
-#
-#     At,Bt = ABfromk(k.value,n,m,T)
-#     SimpleLTVModel(At,Bt)
-# end
 
 function Lcurve(fun, λs)
     errors = pmap(fun, λs)
@@ -132,80 +102,6 @@ function fit_statespace_constrained(x,u,changepoints::AbstractVector; extend=tru
     return SimpleLTVModel(At,Bt,extend)
 end
 
-
-
-
-
-
-
-#=
-using JuMP, SCS, FirstOrderSolvers
-function fit_statespace_jump!(model::AbstractModel,x,u,λ; normType = 1, D = 1,  lasso=0,  extend=true, kwargs...)
-    k             = model2statevec(model)
-    const y, A    = matrices(x,u)
-    nparams       = size(A,2)
-    n,T           = size(x)
-    T            -= 1
-    m             = size(u,1)
-    NK            = length(k)
-    diff_fun      = D == 2 ? x-> diff(diff(x,dims=1),dims=1) : x-> diff(x,dims=1)
-    # model = Model(IpoptSolver())
-    # model         = Model(solver=SCSSolver(
-    #     max_iters = 40000,
-    #     eps       = 1e-5, # convergence tolerance: 1e-3 (default)
-    #     alpha     = 1.8, # relaxation parameter: 1.8 (default)
-    #     rho_x     = 1e-3, # x equality constraint scaling: 1e-3 (default)
-    #     cg_rate   = 2, # for indirect, tolerance goes down like (1/iter)^cg_rate: 2 (default)
-    #     verbose   = 1, # boolean, write out progress: 1 (default)
-    #     normalize = 0, # boolean, heuristic data rescaling: 1 (default)
-    #     scale     = 3 # if normalized, rescales by this factor: 5 (default)
-    #     ))
-    model = Model(solver=DR())
-
-    @variable(model,k2[i=1:T,j=1:nparams], start=k[i,j])
-    for i in eachindex(k)
-        setvalue(k2[i], k[i])
-    end
-    @variable(model, res_norm_const[1:T])
-    @variable(model, sum_res_norm_const)
-    @variable(model, reg_norm_const[1:T-1])
-    @variable(model, sum_reg_norm_const)
-
-    @show size(k)
-    loss = 0
-    @constraints(model, begin
-        res_const[i=1:T], res_norm_const[i] >= norm((y[((i-1)*n+1):(((i-1)*n+1)+n-1),:] -   A[((i-1)*n+1):(((i-1)*n+1)+n-1),:]*k2[i,1:nparams]))
-    end)
-    # loss = 0
-    # for i = 1:T
-    #     loss = sum((y[((i-1)*n+1):(((i-1)*n+1)+n-1),:] -   A[((i-1)*n+1):(((i-1)*n+1)+n-1),:]*k2[i,1:nparams]).^2)
-    # end
-
-
-    dk = diff_fun(k2)#.^2
-    # dk = sum(dk,2)
-    # diffs = dk .== 0
-
-
-    @constraint(model, reg_const[t=1:T-1], reg_norm_const[t] >= norm(dk[t,1:nparams]))
-
-    @constraint(model, sum_res_norm_const >= sum(res_norm_const))
-    @constraint(model, sum_reg_norm_const >= λ*sum(reg_norm_const))
-
-    @objective(model,Min, sum_reg_norm_const + sum_res_norm_const)
-
-
-    # @objective(model,Min, loss)
-    # @constraint(model, sum(diffs) <= 2)
-
-    status = solve(model)
-
-    At,Bt = ABfromk(getvalue(k2),n,m,T)
-    SimpleLTVModel{eltype(At)}(At,Bt,extend)
-end
-
-=#
-
 function matrices2(x,u)
     FT = eltype(x)
     n,T = size(x)
@@ -222,8 +118,6 @@ function matrices2(x,u)
     end
     y,A
 end
-
-using ProximalOperators
 
 
 """
