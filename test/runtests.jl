@@ -70,20 +70,23 @@ end
 
     @testset "No control signal" begin
         @info "Testing No control signal"
-        A,B,x,u,n,m,N = LTVModels.testdata(T=T, σ_state_drift=0.001, σ_param_drift=0.0003, σ_control=0)
+        A,B,x,u,n,m,N = LTVModels.testdata(T=T, σ_state_drift=0.1, σ_param_drift=0.0003, σ_control=0)
         m = 0
-        R1          = 0.3*eye(n^2) # Increase for faster adaptation
+        R1          = 0.0003*eye(n^2) # Increase for faster adaptation
         R2          = 1*eye(n)
         P0          = 10000R1
-        model = KalmanModel(copy(x),R1,R2,P0,extend=true, printfit=false)
+        D = 1
+        for D in [1,2]
+            model = KalmanModel(copy(x),R1,R2,P0,extend=true, printfit=true, D=D)
 
-        normA  = [norm(A[:,:,t]) for t                = 1:T]
-        errorA = [norm(A[:,:,t]-model.At[:,:,t]) for t = 1:T]
+            normA  = [norm(A[:,:,t]) for t                = 1:T]
+            errorA = [norm(A[:,:,t]-model.At[:,:,t]) for t = 1:T]
 
-        @test sum(normA) > 4sum(errorA)
-        @static isinteractive() && plot([normA errorA], lab=["normA" "errA"], show=false, layout=2, subplot=1, size=(1500,900))#, yscale=:log10)
-        @static isinteractive() && plot!(flatten(A), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", lab="True",subplot=2, c=:red)
-        @static isinteractive() && plot!(flatten(model.At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", lab="Estimated", subplot=2, c=:blue)
+            @test sum(normA) > 4sum(errorA)
+            @static isinteractive() && plot([normA errorA], lab=["normA" "errA"], show=false, layout=2, subplot=1, size=(1500,900))#, yscale=:log10)
+            @static isinteractive() && plot!(flatten(A), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", lab="True",subplot=2, c=:red)
+            @static isinteractive() && plot!(flatten(model.At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", lab="Estimated", subplot=2, c=:blue)
+        end
 
     end
 end

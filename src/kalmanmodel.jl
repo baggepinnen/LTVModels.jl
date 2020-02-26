@@ -3,7 +3,16 @@ if !@isdefined(AbstractModel)
 end
 
 
+"""
+    forward_kalman(y, C, R1, R2, P0)
 
+#Arguments:
+- `y`: DESCRIPTION
+- `C`: DESCRIPTION
+- `R1`: State noise
+- `R2`: Meas noise
+- `P0`: Initial state cov
+"""
 function forward_kalman(y,C,R1,R2, P0)
     na,n  = size(C)
     ma  = (n-na^2) ÷ na
@@ -63,6 +72,8 @@ end
 # TODO: Enable imposing of known structure with e.g. a boolean matrix and a coefficient matrix to tell the algorithm which entries are known to be ==1, ==0, ==h etc.
 # Use this matrix to either set some values in C, xkn, Pkn, At,Bt to zero
 eye(n) = Matrix{Float64}(I,n,n)
+
+
 function KalmanModel(model::KalmanModel, xi,u,R1,R2, P0=100R1; extend=false, printfit=true)::KalmanModel
     x,u,xnew = xi[:,1:end-1],u[:,1:end-1],xi[:,2:end]
     n,T = size(x)
@@ -116,31 +127,47 @@ function KalmanModel(model::KalmanModel, prior::KalmanModel, args...; printfit =
 
     end
     if printfit
-        # yhat = predict(model, x,u)
-        # fit = nrmse(xnew,yhat)
-        # println("Modelfit: ", round(fit,3))
+        yhat = predict(model, x,u)
+        fit = nrmse(xnew,yhat)
+        println("Modelfit: ", round(fit,3))
     end
     model
 end
 
 
 
+"""
+    KalmanModel(xi, R1, R2, P0=100R1; extend=false, D=1, printfit=true)::KalmanModel
 
-function KalmanModel(model::KalmanModel, xi,R1,R2, P0=100R1; extend=false, printfit=true)::KalmanModel
+Estimate a Kalman model without control input
+
+#Arguments:
+- `xi`: states
+- `R1`: Parameter transition noise
+- `R2`: State transition noise
+- `P0`: Initial state cov
+- `extend`: add one data point at the end to have length of parameter vector match length of input.
+- `D`: Order of integration of the noise.
+"""
+function KalmanModel(model::KalmanModel, xi,R1,R2, P0=100R1; extend=false, printfit=true, D=1)::KalmanModel
     x,xnew = xi[:,1:end-1],xi[:,2:end]
     n,T = size(x)
     @assert T > n "The calling convention for x and u is that time is the second dimention"
     Ta  = extend ? T+1 : T
     N   = n^2
     y   = copy(xnew)
-    C   = zeros(n,N,T)
+    C   = zeros(n,D*N,T)
+    if D == 2
+        R1 = kron([1/4 1/2; 1/2 1]+0.001I, R1)
+        P0 = kron([1/4 1/2; 1/2 1]+0.001I, P0)
+    end
     @views for t = 1:T
-        C[:,:,t] = kron(eye(n),x[:,t]')
+        C[:,1:N,t] = kron(eye(n),x[:,t]')
     end
     xkn, Pkn,ll    = kalman_smoother(y, C, R1, R2, P0)
     model.ll = ll
     @views for t = 1:T
-        model.At[:,:,t] .= reshape(xkn[:,t],n,n)'
+        model.At[:,:,t] .= reshape(xkn[1:N,t],n,n)'
     end
     @views if extend # Extend model one extra time step (primitive way)
         model.At[:,:,end] .= model.At[:,:,end-1]

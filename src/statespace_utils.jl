@@ -20,6 +20,16 @@ function predict(model::LTVStateSpaceModel, x, u)
     xnew
 end
 
+function predict(model::LTVStateSpaceModel, x)
+    n,T  = size(x)
+    @assert T<=length(model) "Can not predict further than the number of time steps in the model"
+    xnew = Array{eltype(x)}(undef,n,T)
+    @views for t = 1:T
+        xnew[:,t] = model.At[:,:,t] * x[:,t]
+    end
+    xnew
+end
+
 function predict(model::LTVStateSpaceModel, x, u, i)
     # @assert i<=length(model) "Can not predict further than the number of time steps in the model"
     xnew = model.At[:,:,i] * x + model.Bt[:,:,i] * u
