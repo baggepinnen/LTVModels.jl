@@ -3,6 +3,36 @@ using Test, LinearAlgebra, Statistics, Random
 using Plots
 
 eye(n) = Matrix{Float64}(I,n,n)
+
+
+@testset "findpeaks" begin
+    @info "Testing findpeaks"
+
+
+    y = randn(1000)
+    peaks = LTVModels.findpeaks(y,doplot=isinteractive(), filterlength=1)
+    for p in peaks
+        @test y[p] >= y[max(1,p-1)]
+        @test y[p] >= y[min(length(y),p+1)]
+    end
+
+
+    y = randn(1000)
+    peaks = LTVModels.findpeaks(y,doplot=isinteractive(), filterlength=1, minh=2)
+    for p in peaks
+        @test y[p] >= 2
+        @test y[p] >= 2
+    end
+
+    y = randn(1000)
+    peaks = LTVModels.findpeaks(y,doplot=isinteractive(), filterlength=1, minw=10)
+    dpeaks = diff(peaks)
+    @test all(>=(10), dpeaks)
+
+
+end
+
+
 @testset "KalmanModel" begin
     @info "Testing KalmanModel"
 

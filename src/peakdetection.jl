@@ -16,8 +16,8 @@ function findpeaks(activation; filterlength=10, minh=0, threshold=-Inf, minw=0, 
 end
 
 function remove_threshold(peaks,activation,threshold)
-    base = max.(activation[peaks-1],activation[peaks+1])
-    peaks = peaks[activation[peaks]-base .>= threshold]
+    base = max.(activation[peaks .- 1],activation[peaks .+ 1])
+    peaks = peaks[activation[peaks].-base .>= threshold]
 end
 
 function remove_width(peaks,activation,minw,maxw)
@@ -52,5 +52,5 @@ end
 
 function allpeaks(activation)
     da = diff(activation)
-    peaks = findall((diff(da) .< 0) .& (da[1:end-1] .> 0) .& (da[2:end] .< 0)) + 1
+    peaks = findall((diff(da) .< 0) .& (da[1:end-1] .> 0) .& (da[2:end] .< 0)) .+ 1
 end
