@@ -2,6 +2,64 @@ if !@isdefined(AbstractModel)
     include(Pkg.dir("DifferentialDynamicProgramming","src","interfaces.jl"))
 end
 
+
+
+function forward_kalman(y,C,R1,R2, P0)
+    na,n  = size(C)
+    ma  = (n-na^2) ÷ na
+    sa  = na+ma
+    T   = size(y,2)
+    xkk = zeros(n,T);
+    Pkk = zeros(n,n,T)
+    for i = 0:na-1 # TODO: This should be an input, maybe only initialize with first n_param datapoints?
+        ran = (i*sa+1):((i+1)*sa)
+        data_to_use = 1:min(2n, size(y,2))
+        xkk[ran,1]    = C[i+1,ran,data_to_use]'\y[i+1,data_to_use]  # Initialize to semi-global ls solution
+    end
+    R2d = MvNormal(R2)
+    Pkk[:,:,1] .= P0
+    xk         = copy(xkk)
+    Pk         = copy(Pkk)
+    i          = 1
+    Ck         = C[:,:,i]
+    e          = y[:,i]-Ck*xk[:,i]
+    ll         = logpdf(R2d,e)
+    S          = Ck*Pk[:,:,i]*Ck' + R2
+    K          = (Pk[:,:,i]*Ck')/S
+    xkk[:,i]   = xk[:,i] + K*e
+    Pkk[:,:,i] = (I - K*Ck)*Pk[:,:,i]
+    @views for i = 2:T
+        Ak         = 1 # This just assumes a random walk, no additional dynamics
+        Ck         = C[:,:,i]
+        xk[:,i]    = Ak*xkk[:,i-1]
+        Pk[:,:,i]  = Ak*Pkk[:,:,i-1]*Ak' + R1
+        e          = y[:,i]-Ck*xk[:,i]
+        ll        += logpdf(R2d,e)
+        S          = Ck*Pk[:,:,i]*Ck' + R2
+        K          = (Pk[:,:,i]*Ck')/S
+        xkk[:,i]   = xk[:,i] + K*e
+        Pkk[:,:,i] = (I - K*Ck)*Pk[:,:,i]
+    end
+
+    return xkk,xk,Pkk,Pk,ll
+end
+
+function kalman_smoother(y, C, R1, R2, P0)
+    T                = size(y,2)
+    xkk,xk,Pkk,Pk,ll = forward_kalman(y,C,R1,R2, P0)
+    xkn              = similar(xkk)
+    Pkn              = similar(Pkk)
+    xkn[:,end]       = xkk[:,end]
+    Pkn[:,:,end]     = Pkk[:,:,end]
+    @views for i = T-1:-1:1
+        Ck          = Pkk[:,:,i]/Pk[:,:,i+1]
+        xkn[:,i]    = xkk[:,i] + Ck*(xkn[:,i+1] - xk[:,i+1])
+        Pkn[:,:,i]  = Pkk[:,:,i] + Ck*(Pkn[:,:,i+1] - Pk[:,:,i+1])*Ck'
+    end
+    return xkn, Pkn,ll
+end
+
+
 # TODO: Enable imposing of known structure with e.g. a boolean matrix and a coefficient matrix to tell the algorithm which entries are known to be ==1, ==0, ==h etc.
 # Use this matrix to either set some values in C, xkn, Pkn, At,Bt to zero
 eye(n) = Matrix{Float64}(I,n,n)
@@ -67,57 +125,34 @@ end
 
 
 
-function forward_kalman(y,C,R1,R2, P0)
-    na,n  = size(C)
-    ma  = (n-na^2) ÷ na
-    sa  = na+ma
-    T   = size(y,2)
-    xkk = zeros(n,T);
-    Pkk = zeros(n,n,T)
-    for i = 0:na-1 # TODO: This should be an input, maybe only initialize with first n_param datapoints?
-        ran = (i*sa+1):((i+1)*sa)
-        data_to_use = 1:min(2n, size(y,2))
-        xkk[ran,1]    = C[i+1,ran,data_to_use]'\y[i+1,data_to_use]  # Initialize to semi-global ls solution
+
+function KalmanModel(model::KalmanModel, xi,R1,R2, P0=100R1; extend=false, printfit=true)::KalmanModel
+    x,xnew = xi[:,1:end-1],xi[:,2:end]
+    n,T = size(x)
+    @assert T > n "The calling convention for x and u is that time is the second dimention"
+    Ta  = extend ? T+1 : T
+    N   = n^2
+    y   = copy(xnew)
+    C   = zeros(n,N,T)
+    @views for t = 1:T
+        C[:,:,t] = kron(eye(n),x[:,t]')
     end
-    R2d = MvNormal(R2)
-    Pkk[:,:,1] .= P0
-    xk         = copy(xkk)
-    Pk         = copy(Pkk)
-    i          = 1
-    Ck         = C[:,:,i]
-    e          = y[:,i]-Ck*xk[:,i]
-    ll         = logpdf(R2d,e)
-    S          = Ck*Pk[:,:,i]*Ck' + R2
-    K          = (Pk[:,:,i]*Ck')/S
-    xkk[:,i]   = xk[:,i] + K*e
-    Pkk[:,:,i] = (I - K*Ck)*Pk[:,:,i]
-    @views for i = 2:T
-        Ak         = 1 # This just assumes a random walk, no additional dynamics
-        Ck         = C[:,:,i]
-        xk[:,i]    = Ak*xkk[:,i-1]
-        Pk[:,:,i]  = Ak*Pkk[:,:,i-1]*Ak' + R1
-        e          = y[:,i]-Ck*xk[:,i]
-        ll        += logpdf(R2d,e)
-        S          = Ck*Pk[:,:,i]*Ck' + R2
-        K          = (Pk[:,:,i]*Ck')/S
-        xkk[:,i]   = xk[:,i] + K*e
-        Pkk[:,:,i] = (I - K*Ck)*Pk[:,:,i]
+    xkn, Pkn,ll    = kalman_smoother(y, C, R1, R2, P0)
+    model.ll = ll
+    @views for t = 1:T
+        model.At[:,:,t] .= reshape(xkn[:,t],n,n)'
+    end
+    @views if extend # Extend model one extra time step (primitive way)
+        model.At[:,:,end] .= model.At[:,:,end-1]
+        Pkn = cat(Pkn, Pkn[:,:,end], dims=3)
+    end
+    model.extended = extend
+    model.Pt = Pkn
+    if printfit
+        yhat = predict(model, x)
+        fit = nrmse(xnew,yhat)
+        println("Modelfit: ", round.(fit,digits=3))
     end
 
-    return xkk,xk,Pkk,Pk,ll
-end
-
-function kalman_smoother(y, C, R1, R2, P0)
-    T                = size(y,2)
-    xkk,xk,Pkk,Pk,ll = forward_kalman(y,C,R1,R2, P0)
-    xkn              = similar(xkk)
-    Pkn              = similar(Pkk)
-    xkn[:,end]       = xkk[:,end]
-    Pkn[:,:,end]     = Pkk[:,:,end]
-    @views for i = T-1:-1:1
-        Ck          = Pkk[:,:,i]/Pk[:,:,i+1]
-        xkn[:,i]    = xkk[:,i] + Ck*(xkn[:,i+1] - xk[:,i+1])
-        Pkn[:,:,i]  = Pkk[:,:,i] + Ck*(Pkn[:,:,i+1] - Pk[:,:,i+1])*Ck'
-    end
-    return xkn, Pkn,ll
+    return model
 end

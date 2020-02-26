@@ -3,8 +3,10 @@ using Test, LinearAlgebra, Statistics, Random
 using Plots
 
 eye(n) = Matrix{Float64}(I,n,n)
-function test_kalmanmodel(T = 10000)
+@testset "KalmanModel" begin
+    @info "Testing KalmanModel"
 
+    T = 10000
     A,B,x,u,n,m,N = LTVModels.testdata(T=T, σ_state_drift=0.001, σ_param_drift=0.001)
 
     R1          = 0.001*eye(n^2+n*m) # Increase for faster adaptation
@@ -34,6 +36,26 @@ function test_kalmanmodel(T = 10000)
 
     @test all(errorAp .<= errorA) # We expect this since ground truth was used as prior
     @test all(errorBp .<= errorB)
+
+
+    @testset "No control signal" begin
+        @info "Testing No control signal"
+        A,B,x,u,n,m,N = LTVModels.testdata(T=T, σ_state_drift=0.001, σ_param_drift=0.0003, σ_control=0)
+        m = 0
+        R1          = 0.3*eye(n^2) # Increase for faster adaptation
+        R2          = 1*eye(n)
+        P0          = 10000R1
+        model = KalmanModel(copy(x),R1,R2,P0,extend=true, printfit=false)
+
+        normA  = [norm(A[:,:,t]) for t                = 1:T]
+        errorA = [norm(A[:,:,t]-model.At[:,:,t]) for t = 1:T]
+
+        @test sum(normA) > 4sum(errorA)
+        @static isinteractive() && plot([normA errorA], lab=["normA" "errA"], show=false, layout=2, subplot=1, size=(1500,900))#, yscale=:log10)
+        @static isinteractive() && plot!(flatten(A), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", lab="True",subplot=2, c=:red)
+        @static isinteractive() && plot!(flatten(model.At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", lab="Estimated", subplot=2, c=:blue)
+
+    end
 end
 
 
@@ -41,10 +63,12 @@ end
 # Tests ========================================================================
 
 # Iterative solver =============================================================
-function test_fit_statespace()
+@testset "Statespace fit" begin
+    @info "Testing Statespace fit"
+
+
     # Generate data
-# using Revise
-# using LTVModels, ProximalOperators
+
     T_       = 400
     x,xm,u,n,m = LTVModels.testdata(T_)
 
@@ -56,12 +80,12 @@ function test_fit_statespace()
     end
 
     @time model = LTVModels.fit_statespace_admm(xm,u,17, extend=true,
-        iters    = 20000,
-        D        = 1,
-        zeroinit = true,
-        tol      = 1e-5,
-        ridge    = 0,
-        cb       = callback);
+    iters    = 20000,
+    D        = 1,
+    zeroinit = true,
+    tol      = 1e-5,
+    ridge    = 0,
+    cb       = callback);
     # using ProfileView
     # ProfileView.view()
     # model, cost, steps = fit_statespace_gd!(model,xm,u,100, normType = 1, D = 1, lasso = 1e-8, step=5e-3, momentum=0.99, iters=1000, reduction=0.1, extend=true);
@@ -71,11 +95,11 @@ function test_fit_statespace()
 
     At,Bt = model.At,model.Bt
     @static isinteractive() && begin
-        plot(flatten(At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
-        plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), l=(:dash,:black, 1))
-        plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
-        gui()
-    end
+    plot(flatten(At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
+    plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), l=(:dash,:black, 1))
+    plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
+    gui()
+
 
     # R1          = 0.1*eye(n^2+n*m) # Increase for faster adaptation
     # R2          = 10*eye(n)
@@ -118,7 +142,7 @@ function test_fit_statespace()
     @static isinteractive() && plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
     @static isinteractive() && plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
 
-    rms(e)
+    @test all(rms(e) .< 0.3)
 end
 
 
@@ -150,10 +174,5 @@ function test_gmmmodel()
 end
 
 
-
-# gr()
-# LTVModels.test_gmmmodel() # Not working on 0.6 due to GaussianMixtures.jl
-@test all(test_fit_statespace() .< 0.3)
 LTVModels.benchmark_const(100, 2, true) # Dynamic Programming Bellman
 LTVModels.benchmark_ss(100, 2, true)    # Dynamic Programming Bellman
-test_kalmanmodel()

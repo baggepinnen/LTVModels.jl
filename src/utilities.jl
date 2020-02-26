@@ -107,11 +107,11 @@ end
 
 
 """
-    A,B,x,u,n,m,N = testdata(T=10000, σ_state_drift=0.001, σ_param_drift=0.001)
+    A,B,x,u,n,m,N = testdata(T=10000, σ_state_drift=0.001, σ_param_drift=0.001, σ_control=1)
 
 Create an LTVModel with Brownian-walk A[t] and B[t]
 """
-function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001, seed=1)
+function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001, seed=1, σ_control=1)
     Random.seed!(seed)
     n           = 3
     m           = 2
@@ -119,7 +119,7 @@ function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001, seed=1)
     A           = zeros(n,n,T)
     B           = zeros(n,m,T)
     x           = zeros(n,T)
-    u           = randn(m,T)
+    u           = σ_control*randn(m,T)
     U,S,V       = ⟂(randn(n,n)), diagm(0=>0.4rand(n)), ⟂(randn(n,n))
     A[:,:,1]    = U*S*V'
     B[:,:,1]    = 0.5randn(n,m)
