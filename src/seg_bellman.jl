@@ -26,8 +26,8 @@ end
 @inline function argmin_lin(input,w,t1,t2)
     y   = input[1]
     A   = input[2]
-    yminus = A[t1:t2,1] - ysim[t1]
-    yreg = y[t1:t2]-yminus
+    yminus = A[t1:t2,1] .- y[t1]
+    yreg = y[t1:t2] .- yminus
     ones(t2-t1+1,1)\yreg # TODO: does not take care of w yet
 end
 
@@ -41,10 +41,10 @@ end
     A   = input[2]
     n   = size(y,1) ÷ length(w)
     k   = argminfun(input,w,t1,t2)
-    yminus = A[t1:t2,1] - ysim[t1]
+    yminus = A[t1:t2,1] .- y[t1]
 
 
-    e   = y[t1:t2]-yminus-ones(t2-t1+1,1)*k
+    e   = y[t1:t2] .- yminus .- k
     return e⋅e
 end
 
@@ -172,21 +172,22 @@ function benchmark_lin(T_, M, doplot=false)
     # M        = 1
     # T_       = 400
     x = sin.(range(0, stop=2π, length=T_))
-    input = matrices(x,ones(x))
+    input = matrices(x',ones(1,T_))
     @time V,t,a = seg_bellman(input,M, ones(T_-1), cost_lin, argmin_lin, doplot=false)
-    if doplot
-        k = reduce(hcat, a)'
-        At = reshape(k[:,1:n^2]',n,n,M+1)
-        At = permutedims(At, [2,1,3])
-        tplot = [1;t;T_]
-        plot()
-        for i = 1:M+1
-            plot!(tplot[i:i+1],flatten(At)[i,:]'.*ones(2), c=[:blue :green :red :magenta], xlabel="Time index", ylabel="Model coefficients")
-        end
-        plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
-        plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
-        gui()
-    end
+    # if doplot
+    #     k = reduce(hcat, a)'
+    #     @show size(a), size(k)
+    #     At = reshape(k[:,1:n^2]',n,n,M+1)
+    #     At = permutedims(At, [2,1,3])
+    #     tplot = [1;t;T_]
+    #     plot()
+    #     for i = 1:M+1
+    #         plot!(tplot[i:i+1],flatten(At)[i,:]'.*ones(2), c=[:blue :green :red :magenta], xlabel="Time index", ylabel="Model coefficients")
+    #     end
+    #     plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
+    #     plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
+    #     gui()
+    # end
     V,t,a
 end
 

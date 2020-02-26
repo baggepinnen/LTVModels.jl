@@ -23,7 +23,8 @@ function getD(D,T)
 end
 
 function matrices(x::AbstractArray{FT},u) where FT
-    n,T = size(x)
+    n = size(x,1)
+    T = size(x,2)
     T -= 1
     m = size(u,1)
     A = spzeros(FT, T*n, n^2+n*m)

@@ -206,3 +206,5 @@ end
 
 LTVModels.benchmark_const(100, 2, true) # Dynamic Programming Bellman
 LTVModels.benchmark_ss(100, 2, true)    # Dynamic Programming Bellman
+
+LTVModels.benchmark_lin(100, 2, true)
