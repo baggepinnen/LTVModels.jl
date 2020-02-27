@@ -26,7 +26,7 @@ function fit_statespace_gd(x,u,λ; initializer::Symbol=:kalman, extend=false,kwa
     fit_statespace_gd!(model, x,u,λ; extend=extend, kwargs...)
 end
 
-function fit_statespace_gd!(model::AbstractModel,x,u,λ; normType = 1, D = 1, step=0.001, iters=10000, lasso=0, decay_rate=0.999, momentum=0.9, print_period = 100, reduction=0, extend=true, kwargs...)
+function fit_statespace_gd!(model::AbstractModel,x,u,λ; normType = 1, D = 1, step=0.001, iters=10000, lasso=0, decay_rate=0.999, momentum=0.9, print_period = 100, reduction=0, extend=true, opt=LBFGS(m=100), kwargs...)
     if reduction > 0
         decay_rate = decayfun(iters, reduction)
     end
@@ -55,34 +55,49 @@ function fit_statespace_gd!(model::AbstractModel,x,u,λ; normType = 1, D = 1, st
         end
         loss
     end
-    inputs      = (k,)
+
+
+    # inputs      = (k,)
+    # loss_tape   = GradientTape(lossfun, inputs)
+    # results     = similar.(inputs)
+    # all_results = DiffResults.GradientResult.(results)
+    #
+    # mom         = zeros(size(k))
+    # @show bestcost    = lossfun(k)
+    # costs       = Inf*ones(iters+1); costs[1] = bestcost
+    # steps       = zeros(iters)
+    # # opt         = RMSpropOptimizer(k, step, 0.8, momentum)
+    # opt         = ADAMOptimizer(k; α = step,  β1 = 0.9, β2 = 0.999, ɛ = 1e-8)
+    # @progress for iter = 1:iters
+    #     steps[iter] = step
+    #     gradient!(all_results, loss_tape, inputs)
+    #     costs[iter] = all_results[1].value
+    #     # mom .= step.*all_results[1].derivs[1] .+ momentum.*mom
+    #     # k .-= mom
+    #     opt(all_results[1].derivs[1], iter)
+    #     # opt(all_results.derivs, iter)
+    #     if iter % print_period == 0
+    #         println("Iteration: ", iter, " cost: ", round(costs[iter],digits=6), " stepsize: ", step)
+    #     end
+    #     step *=  decay_rate
+    #     opt.α = step
+    # end
+
+
+    inputs      = k
     loss_tape   = GradientTape(lossfun, inputs)
-    results     = similar.(inputs)
-    all_results = DiffResults.GradientResult.(results)
-    mom         = zeros(size(k))
-    @show bestcost    = lossfun(k)
-    costs       = Inf*ones(iters+1); costs[1] = bestcost
-    steps       = zeros(iters)
-    # opt         = RMSpropOptimizer(k, step, 0.8, momentum)
-    opt         = ADAMOptimizer(k; α = step,  β1 = 0.9, β2 = 0.999, ɛ = 1e-8)
-    @progress for iter = 1:iters
-        steps[iter] = step
-        gradient!(all_results, loss_tape, inputs)
-        costs[iter] = all_results[1].value
-        # mom .= step.*all_results[1].derivs[1] .+ momentum.*mom
-        # k .-= mom
-        # opt(all_results[1].derivs[1])
-        opt(all_results[1].derivs[1], iter)
-        if iter % print_period == 0
-            println("Iteration: ", iter, " cost: ", round(costs[iter],digits=6), " stepsize: ", step)
-        end
-        step *=  decay_rate
-        opt.α = step
-    end
+    results     = similar(inputs)
+    all_results = DiffResults.GradientResult(results)
+    gradfun = (G,inputs) -> gradient!(G, loss_tape, inputs)
+    costs = Optim.optimize(lossfun, gradfun, k, opt, Optim.Options(store_trace=true, show_trace=true, show_every=10, iterations=10000, allow_f_increases=false, time_limit=100, x_tol=0, f_tol=0, g_tol=1e-8, f_calls_limit=iters, g_calls_limit=0))
+
+    k = costs.minimizer
 
     At,Bt = ABfromk(k,n,m,T)
-    SimpleLTVModel(At,Bt,extend),costs, steps
+    SimpleLTVModel(At,Bt,extend), costs
 end
+
+
 
 function fit_statespace_constrained(x,u,changepoints::AbstractVector; extend=true)
     y,A           = matrices(x,u)

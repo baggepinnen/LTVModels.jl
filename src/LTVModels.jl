@@ -14,7 +14,7 @@ export KalmanModel, KalmanAR, rootspectrogram
 using ControlSystems, DSP, Plots, Juno#, Convex, FirstOrderSolvers
 using Test
 
-using DiffResults
+using DiffResults, Optim
 using ReverseDiff: GradientTape, GradientConfig, gradient!
 
 """

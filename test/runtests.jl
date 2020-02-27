@@ -1,6 +1,6 @@
 using LTVModels
 using Test, LinearAlgebra, Statistics, Random
-using Plots
+using Plots, Optim
 
 eye(n) = Matrix{Float64}(I,n,n)
 @testset "LTVModels" begin
@@ -29,7 +29,6 @@ eye(n) = Matrix{Float64}(I,n,n)
         peaks = LTVModels.findpeaks(y,doplot=isinteractive(), filterlength=1, minw=10)
         dpeaks = diff(peaks)
         @test all(>=(10), dpeaks)
-
 
     end
 
@@ -90,36 +89,36 @@ eye(n) = Matrix{Float64}(I,n,n)
             end
 
         end
+
+        @testset "KalmanAR" begin
+            @info "Testing KalmanAR"
+            ## Generate chirp signal
+            T = 2^14
+            e = 0.01randn(T)
+            fs = 16_000
+            t = range(0,step=1/fs, length=T)
+            chirp_f1 = LinRange(2000, 2500, T)
+            chirp_f2 = 5000 .+ 200sin.(2pi/T .* (1:T))
+            y = sin.(2pi .* chirp_f1 .* t )
+            y .+= sin.(2pi .* chirp_f2 .* t )
+            yn = y + e
+
+            n  = 6
+            R1 = eye(n) # Increase for faster adaptation
+            R2 = [1e5]
+            P0 = 1e4R1
+            @time model = KalmanAR(yn,R1,R2,P0,extend=true, printfit=false, D=1)
+            RS = LTVModels.rootspectrogram(model,fs)
+            @test mean(minimum(abs, RS .-  LinRange(2000, 3000, T), dims=2)) < 20 # for some reason, the increase in frequency is double that of the increase in the chirp. This seems correct as a welch spectrogam shows the same.
+
+            @time model = KalmanAR(yn,R1,R2,P0,extend=true, printfit=false, D=2)
+            RS = LTVModels.rootspectrogram(model,fs)
+            @test mean(minimum(abs, RS .-  LinRange(2000, 3000, T), dims=2)) < 20
+
+
+        end
+
     end
-    @testset "KalmanAR" begin
-        @info "Testing KalmanAR"
-        ## Generate chirp signal
-        T = 2^14
-        e = 0.01randn(T)
-        fs = 16_000
-        t = range(0,step=1/fs, length=T)
-        chirp_f1 = LinRange(2000, 2500, T)
-        chirp_f2 = 5000 .+ 200sin.(2pi/T .* (1:T))
-        y = sin.(2pi .* chirp_f1 .* t )
-        y .+= sin.(2pi .* chirp_f2 .* t )
-        yn = y + e
-
-        n  = 6
-        R1 = eye(n) # Increase for faster adaptation
-        R2 = [1e5]
-        P0 = 1e4R1
-        @time model = KalmanAR(yn,R1,R2,P0,extend=true, printfit=false, D=1)
-        RS = LTVModels.rootspectrogram(model,fs)
-        @test mean(minimum(abs, RS .-  LinRange(2000, 3000, T), dims=2)) < 20 # for some reason, the increase in frequency is double that of the increase in the chirp. This seems correct as a welch spectrogam shows the same.
-
-        @time model = KalmanAR(yn,R1,R2,P0,extend=true, printfit=false, D=2)
-        RS = LTVModels.rootspectrogram(model,fs)
-        @test mean(minimum(abs, RS .-  LinRange(2000, 3000, T), dims=2)) < 20
-
-
-    end
-
-
 
 
     # Tests ========================================================================
@@ -157,10 +156,11 @@ eye(n) = Matrix{Float64}(I,n,n)
 
         At,Bt = model.At,model.Bt
         @static isinteractive() && begin
-        plot(flatten(At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
-        plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), l=(:dash,:black, 1))
-        plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
-        gui()
+            plot(flatten(At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
+            plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), l=(:dash,:black, 1))
+            plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
+            gui()
+        end
 
 
         # R1          = 0.1*eye(n^2+n*m) # Increase for faster adaptation
@@ -184,8 +184,13 @@ eye(n) = Matrix{Float64}(I,n,n)
         fit_statespace_constrained(xm,u,changepoints)
 
 
+        Random.seed!(0)
+        T_       = 200
+        x,xm,u,n,m = LTVModels.testdata(T_)
+
+
         # TODO: reenable tests below when figured out error with DiffBase
-        model2, cost2, steps2 = fit_statespace_gd(xm,u,5000, normType = 1, D = 2, step=0.01, iters=10000, reduction=0.1, extend=true);
+        model2, res = fit_statespace_gd(xm,u,5000, normType = 1, D = 2, step=0.01, iters=1000, reduction=0.1, extend=true, opt=LBFGS(m=50));
         y2 = predict(model2,x,u);
         At2,Bt2 = model2.At,model2.Bt
         e2 = x[:,2:end] - y2[:,1:end-1]
@@ -195,7 +200,7 @@ eye(n) = Matrix{Float64}(I,n,n)
         @static isinteractive() && plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
 
 
-        model2, cost2, steps2 = fit_statespace_gd(xm,u,1e10, normType = 2, D = 2, step=0.01, momentum=0.99, iters=10000, reduction=0.01, extend=true, lasso=1e-4);
+        model2, res = fit_statespace_gd(xm,u,1e10, normType = 2, D = 2, step=0.01, momentum=0.99, iters=10000, reduction=0.01, extend=true, lasso=1e-4);
         y2 = predict(model2,x,u);
         At2,Bt2 = model2.At,model2.Bt
         e2 = x[:,2:end] - y2[:,1:end-1]
@@ -204,7 +209,7 @@ eye(n) = Matrix{Float64}(I,n,n)
         @static isinteractive() && plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
         @static isinteractive() && plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
 
-        @test all(rms(e) .< 0.3)
+        @test all(rms(e2) .< 0.5)
     end
 
 
@@ -236,11 +241,11 @@ eye(n) = Matrix{Float64}(I,n,n)
     end
 
 
+@testset "bellman" begin
+    @info "Testing bellman"
     LTVModels.benchmark_const(100, 2, true) # Dynamic Programming Bellman
     LTVModels.benchmark_ss(100, 2, true)    # Dynamic Programming Bellman
-
     LTVModels.benchmark_lin(100, 2, true)
-
-
 end
+
 end

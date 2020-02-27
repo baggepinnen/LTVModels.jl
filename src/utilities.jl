@@ -161,65 +161,65 @@ end
 
 
 # Optimizers ===================================================================
-
-
-struct RMSpropOptimizer{VecType}
-    α::Float64
-    rmspropfactor::Float64
-    momentum::Float64
-    Θ::VecType
-    dΘs::VecType
-    dΘs2::VecType
-end
-
-function RMSpropOptimizer(Θ, α, rmspropfactor=0.8, momentum=0.1)
-    RMSpropOptimizer(α, rmspropfactor, momentum, Θ, ones(size(Θ)), zeros(size(Θ)))
-end
-
-function (opt::RMSpropOptimizer)(dΘ)
-    opt.dΘs .= opt.rmspropfactor.*opt.dΘs .+ (1-opt.rmspropfactor).*dΘ.^2
-    ΔΘ = -opt.α * dΘ
-    ΔΘ ./= sqrt.(opt.dΘs.+1e-10) # RMSprop
-
-    # ΔΘ = dΘ./sqrt(dΘs+1e-10).*sqrt(dΘs2) # ADAdelta
-    # dΘs2 .= 0.9dΘs2 + 0.1ΔΘ.^2 # ADAdelta
-    opt.dΘs2 .= opt.momentum.*opt.dΘs2 .+ ΔΘ # Momentum + RMSProp
-    opt.Θ .+= opt.dΘs2
-end
-
-
-mutable struct ADAMOptimizer{T, VecType <: AbstractArray}
-    Θ::VecType
-    α::T
-    β1::T
-    β2::T
-    ɛ::T
-    m::VecType
-    v::VecType
-    expdecay::Float64
-end
-
-ADAMOptimizer(Θ::VecType; α::T = 0.005,  β1::T = 0.9, β2::T = 0.999, ɛ::T = 1e-8, m=zeros(size(Θ)), v=zeros(size(Θ)), expdecay=0) where {T,VecType <: AbstractArray} = ADAMOptimizer{T,VecType}(Θ, α,  β1, β2, ɛ, m, v, expdecay)
-
-"""
-    (a::ADAMOptimizer{T,VecType})(g::VecType, t::Integer)
-Applies the gradient `g` to the parameters `a.Θ` (mutating) at iteration `t`
-ADAM GD update http://sebastianruder.com/optimizing-gradient-descent/index.html#adam
-"""
-function (a::ADAMOptimizer)(g, t::Integer)
-    mul = (1-a.β1)
-    mul2 = (1-a.β2)
-    div  = 1/(1 - a.β1 ^ t)
-    div2 = 1/(1 - a.β2 ^ t)
-    α,β1,β2,ɛ,m,v,Θ,γ = a.α,a.β1,a.β2,a.ɛ,a.m,a.v,a.Θ,a.expdecay
-    γ *= t > 5
-    Base.Threads.@threads for i = eachindex(g)
-        @inbounds m[i] = β1 * m[i] + mul * (g[i] + γ*Θ[i])
-        @inbounds v[i] = β2 * v[i] + mul2 * g[i]^2
-        @inbounds Θ[i] -= α * m[i] * div / (sqrt(v[i] * div2) + ɛ)
-    end
-    Θ
-end
+#
+#
+# struct RMSpropOptimizer{VecType}
+#     α::Float64
+#     rmspropfactor::Float64
+#     momentum::Float64
+#     Θ::VecType
+#     dΘs::VecType
+#     dΘs2::VecType
+# end
+#
+# function RMSpropOptimizer(Θ, α, rmspropfactor=0.8, momentum=0.1)
+#     RMSpropOptimizer(α, rmspropfactor, momentum, Θ, ones(size(Θ)), zeros(size(Θ)))
+# end
+#
+# function (opt::RMSpropOptimizer)(dΘ)
+#     opt.dΘs .= opt.rmspropfactor.*opt.dΘs .+ (1-opt.rmspropfactor).*dΘ.^2
+#     ΔΘ = -opt.α * dΘ
+#     ΔΘ ./= sqrt.(opt.dΘs.+1e-10) # RMSprop
+#
+#     # ΔΘ = dΘ./sqrt(dΘs+1e-10).*sqrt(dΘs2) # ADAdelta
+#     # dΘs2 .= 0.9dΘs2 + 0.1ΔΘ.^2 # ADAdelta
+#     opt.dΘs2 .= opt.momentum.*opt.dΘs2 .+ ΔΘ # Momentum + RMSProp
+#     opt.Θ .+= opt.dΘs2
+# end
+#
+#
+# mutable struct ADAMOptimizer{T, VecType <: AbstractArray}
+#     Θ::VecType
+#     α::T
+#     β1::T
+#     β2::T
+#     ɛ::T
+#     m::VecType
+#     v::VecType
+#     expdecay::Float64
+# end
+#
+# ADAMOptimizer(Θ::VecType; α::T = 0.005,  β1::T = 0.9, β2::T = 0.999, ɛ::T = 1e-8, m=zeros(size(Θ)), v=zeros(size(Θ)), expdecay=0) where {T,VecType <: AbstractArray} = ADAMOptimizer{T,VecType}(Θ, α,  β1, β2, ɛ, m, v, expdecay)
+#
+# """
+#     (a::ADAMOptimizer{T,VecType})(g::VecType, t::Integer)
+# Applies the gradient `g` to the parameters `a.Θ` (mutating) at iteration `t`
+# ADAM GD update http://sebastianruder.com/optimizing-gradient-descent/index.html#adam
+# """
+# function (a::ADAMOptimizer)(g, t::Integer)
+#     mul = (1-a.β1)
+#     mul2 = (1-a.β2)
+#     div  = 1/(1 - a.β1 ^ t)
+#     div2 = 1/(1 - a.β2 ^ t)
+#     α,β1,β2,ɛ,m,v,Θ,γ = a.α,a.β1,a.β2,a.ɛ,a.m,a.v,a.Θ,a.expdecay
+#     γ *= t > 5
+#     Base.Threads.@threads for i = eachindex(g)
+#         @inbounds m[i] = β1 * m[i] + mul * (g[i] + γ*Θ[i])
+#         @inbounds v[i] = β2 * v[i] + mul2 * g[i]^2
+#         @inbounds Θ[i] -= α * m[i] * div / (sqrt(v[i] * div2) + ɛ)
+#     end
+#     Θ
+# end
 # function (a::ADAMOptimizer)(g, t::Integer)
 #     a.m .= a.β1 .* a.m .+ (1-a.β1) .* g
 #     a.v .= a.β2 .* a.v .+ (1-a.β2) .* g.^2
