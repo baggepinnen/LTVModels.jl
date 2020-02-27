@@ -20,7 +20,7 @@ function KalmanModel(x,u,R1,R2,args...; extend=false, kwargs...)::KalmanModel
     m     = size(u,1)
     N     = n*(n+m)
     model = KalmanModel(zeros(n,n,T),zeros(n,m,T),zeros(N,N,T),extend)
-    LTVModels.KalmanModel(model, x,u,args...; extend=extend, kwargs...)
+    LTVModels.KalmanModel(model, x,u,R1,R2,args...; extend=extend, kwargs...)
     model
 end
 

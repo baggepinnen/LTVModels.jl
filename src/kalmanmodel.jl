@@ -109,8 +109,8 @@ function KalmanModel(model::KalmanModel, xi,u,R1,R2, P0=100R1; extend=false, pri
     return model
 end
 
-function KalmanModel(model::KalmanModel, prior::KalmanModel, args...; printfit = true, kwargs...)::KalmanModel
-    model = KalmanModel(model, args...; printfit = false, kwargs...) # Fit model in the standard way without prior
+function KalmanModel(model::KalmanModel, prior::KalmanModel, X,U,args...; printfit = true, kwargs...)::KalmanModel
+    model = KalmanModel(model, X,U,args...; printfit = false, kwargs...) # Fit model in the standard way without prior
     n,m,T = size(model.Bt)
     # @views model2statevec(model,t) = [vec(model.At[:,:,t]);  vec(model.Bt[:,:,t])][:]
     # @views model2statevec(model,t) = [model.At[:,:,t]  model.Bt[:,:,t]] |> vec
@@ -127,9 +127,9 @@ function KalmanModel(model::KalmanModel, prior::KalmanModel, args...; printfit =
 
     end
     if printfit
-        yhat = predict(model, x,u)
-        fit = nrmse(xnew,yhat)
-        println("Modelfit: ", round(fit,3))
+        yhat = predict(model, X[:,1:end-1],U[:,1:end-1])
+        fit = nrmse(X[:,2:end],yhat)
+        println("Modelfit: ", round.(fit,sigdigits=3))
     end
     model
 end
