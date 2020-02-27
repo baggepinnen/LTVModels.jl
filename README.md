@@ -25,8 +25,8 @@ This repository implements the system-identification methods presented in
 # Installation
 ```julia
 using Pkg
-Pkg.add("LinearTimeVaryingModelsBase")
-Pkg.add("https://github.com/baggepinnen/LTVModels.jl")
+pkg"add LinearTimeVaryingModelsBase"
+pkg"add https://github.com/baggepinnen/LTVModels.jl"
 using LTVModels
 ```
 
@@ -86,7 +86,7 @@ anim = @animate for r2 = exp10.(range(-3, stop=3, length=10))
     R1          = 0.001*eye(n^2+n*m)
     R2          = r2*eye(n)
     P0          = 10000R1
-    model = KalmanModel(copy(x),copy(u),R1,R2,P0,extend=true)
+    model = KalmanModel(copy(x),copy(u),R1,R2,P0,extend=true, D=1)
 
     plot(flatten(A), l=(2,), xlabel="Time index", ylabel="Model coefficients", lab="True", c=:red)
     plot!(flatten(model.At), l=(2,), lab="Estimated", c=:blue, legend=false)
