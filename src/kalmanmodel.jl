@@ -22,7 +22,7 @@ function forward_kalman(y,C,R1,R2, P0)
     Pkk = zeros(n,n,T)
     for i = 0:na-1 # TODO: This should be an input, maybe only initialize with first n_param datapoints?
         ran = (i*sa+1):((i+1)*sa)
-        data_to_use = 1:min(2n, size(y,2))
+        data_to_use = 1:min(10n, size(y,2))
         xkk[ran,1]    = C[i+1,ran,data_to_use]'\y[i+1,data_to_use]  # Initialize to semi-global ls solution
     end
     R2d = MvNormal(R2)

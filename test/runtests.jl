@@ -3,6 +3,9 @@ using Test, LinearAlgebra, Statistics, Random
 using Plots
 
 eye(n) = Matrix{Float64}(I,n,n)
+@testset "LTVModels" begin
+    @info "Testing LTVModels"
+
 
 
 @testset "findpeaks" begin
@@ -211,3 +214,5 @@ LTVModels.benchmark_const(100, 2, true) # Dynamic Programming Bellman
 LTVModels.benchmark_ss(100, 2, true)    # Dynamic Programming Bellman
 
 LTVModels.benchmark_lin(100, 2, true)
+
+end
