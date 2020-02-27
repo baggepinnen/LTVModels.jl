@@ -8,10 +8,10 @@ SimpleLTVModel, rms, sse, nrmse, modelfit, aic
 
 export predict, simulate
 
-export KalmanModel, GMMModel
+export KalmanModel, KalmanAR, rootspectrogram
 
 
-using DSP, Plots, Juno#, Convex, FirstOrderSolvers
+using ControlSystems, DSP, Plots, Juno#, Convex, FirstOrderSolvers
 using Test
 
 using DiffResults
@@ -46,6 +46,15 @@ mutable struct GMMModel <: AbstractModel
     dynamics
     T
 end
+
+mutable struct KalmanAR{T} <: LinearTimeVaryingModelsBase.LTVModel
+    θ::Array{T,2}
+    Pt::Array{T,3}
+    extended::Bool
+    ll::Float64
+end
+
+Base.length(m::KalmanAR) = size(m.θ,2)
 
 include("utilities.jl")
 include("peakdetection.jl")

@@ -92,6 +92,34 @@ end
         end
 
     end
+
+    @testset "KalmanAR" begin
+        @info "Testing KalmanAR"
+        ## Generate chirp signal
+        T = 2^14
+        e = 0.01randn(T)
+        fs = 16_000
+        t = range(0,step=1/fs, length=T)
+        chirp_f1 = LinRange(2000, 2500, T)
+        chirp_f2 = 5000 .+ 200sin.(2pi/T .* (1:T))
+        y = sin.(2pi .* chirp_f1 .* t )
+        y .+= sin.(2pi .* chirp_f2 .* t )
+        yn = y + e
+
+        n  = 6
+        R1 = eye(n) # Increase for faster adaptation
+        R2 = [1e5]
+        P0 = 1e4R1
+        @time model = KalmanAR(yn,R1,R2,P0,extend=true, printfit=false, D=1)
+        RS = LTVModels.rootspectrogram(model,fs)
+        @test mean(minimum(abs, RS .-  LinRange(2000, 3000, T), dims=2)) < 20 # for some reason, the increase in frequency is double that of the increase in the chirp. This seems correct as a welch spectrogam shows the same.
+
+        @time model = KalmanAR(yn,R1,R2,P0,extend=true, printfit=false, D=2)
+        RS = LTVModels.rootspectrogram(model,fs)
+        @test mean(minimum(abs, RS .-  LinRange(2000, 3000, T), dims=2)) < 20
+
+
+    end
 end
 
 

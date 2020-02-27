@@ -183,3 +183,64 @@ function KalmanModel(model::KalmanModel, xi,R1,R2, P0=100R1; extend=false, print
 
     return model
 end
+
+
+function KalmanAR(model::KalmanAR, yi,R1,R2, P0=100R1; extend=false, printfit=true, D=1)
+    y,ynew = yi[1:end-1],yi[2:end]
+    T = length(y)
+    n = size(R1,1)
+    Ta  = extend ? T+1 : T
+    ϕ   = zeros(1,D*n,T)
+    if D == 2
+        R1 = kron([1/4 1/2; 1/2 1]+0.001I, R1)
+        P0 = kron([1/4 1/2; 1/2 1]+0.001I, P0)
+    end
+    inds = 1:n
+    y0 = [zeros(n-1);y]
+    @views for t = 1:T
+        ϕ[1,1:n,t] = y0[inds .+ (t-1)]
+    end
+    xkn, Pkn,ll = kalman_smoother(ynew', ϕ, R1, R2, P0)
+    model.ll = ll
+    @views for t = 1:T
+        model.θ[:,t] .= xkn[1:n,t]
+    end
+    @views if extend # Extend model one extra time step (primitive way)
+        model.θ[:,end] .= model.θ[:,end-1]
+        Pkn = cat(Pkn, Pkn[:,:,end], dims=3)
+    end
+    model.extended = extend
+    model.Pt = Pkn
+    if printfit
+        yhat = predict(model, y)
+        fit = nrmse(ynew,yhat)
+        println("Modelfit: ", round.(fit,digits=3))
+    end
+
+    return model
+end
+
+
+
+function predict(model::KalmanAR, y)
+    T  = length(y)
+    n = size(model.θ, 1)
+    @assert T<=length(model) "Can not predict further than the number of time steps in the model"
+    y0 = [zeros(n-1);y]
+    ynew = zeros(eltype(y), T)
+    inds = 1:n
+    @views for t = 1:T
+        ynew[t] = model.θ[:,t]'y0[inds .+ (t-1)]
+    end
+    ynew
+end
+
+
+function rootspectrogram(model, fs)
+    roots = map(1:length(model)) do i
+        sys = tf(1,[1;-reverse(model.θ[:,i])],1)
+        (sort(pole(sys), by=imag, rev=true)[1:end÷2])
+    end
+    S = reduce(hcat,roots)
+    fs/(2pi) .* angle.(S)'
+end
