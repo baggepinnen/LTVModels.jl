@@ -85,7 +85,7 @@ function seg_bellman(y,M,w, costfun=cost_const, argminfun=argmin_const; doplot=f
 
     # iterate Bellman iteration
     fnext = Vector{Float64}(undef,n)
-    @progress for jj = M-1:-1:1
+    for jj = M-1:-1:1
         for kk = jj:n-(M-jj)
             opt   = Inf
             optll = 0
@@ -172,7 +172,9 @@ function benchmark_lin(T_, M, doplot=false)
     # M        = 1
     # T_       = 400
     x = sin.(range(0, stop=2π, length=T_))
-    input = matrices(x',ones(1,T_))
+    u = ones(1,T_)
+    d = iddata(x',u, x')
+    input = matrices(SimpleLTVModel(d), d)
     @time V,t,a = seg_bellman(input,M, ones(T_-1), cost_lin, argmin_lin, doplot=false)
     # if doplot
     #     k = reduce(hcat, a)'
@@ -197,7 +199,8 @@ function benchmark_ss(T_, M, doplot=false)
     # M        = 1
     # T_       = 400
     x,xm,u,n,m = testdata(T_)
-    input = matrices(xm,u)
+    dn = iddata(xm,u,xm)
+    input = matrices(SimpleLTVModel(dn), dn)
 
     @time V,t,a = seg_bellman(input,M, ones(T_-1), cost_ss, argmin_ss, doplot=false)
     if doplot

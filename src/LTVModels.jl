@@ -6,12 +6,15 @@ dc,calculate_cost,calculate_final_cost,
 predict, simulate, df,costfun, LTVStateSpaceModel,
 SimpleLTVModel, rms, sse, nrmse, modelfit, aic
 
-export predict, simulate
+import ControlSystemIdentification: OutputData, InputOutputData, InputOutputStateData, AnyInput, AbstractIdData, oftype, time1, input, output, state
+import ControlSystems: ninputs, noutputs, nstates
 
-export KalmanModel, KalmanAR, rootspectrogram
+export predict, simulate, iddata, input, output, state, ninputs, noutputs, nstates
+
+export SimpleLTVModel, KalmanModel, LTVAutoRegressive, rootspectrogram
 
 
-using ControlSystems, DSP, Plots, Juno#, Convex, FirstOrderSolvers
+using ControlSystems, DSP, Plots
 using Test
 
 using DiffResults, Optim
@@ -47,14 +50,15 @@ mutable struct GMMModel <: AbstractModel
     T
 end
 
-mutable struct KalmanAR{T} <: LinearTimeVaryingModelsBase.LTVModel
+mutable struct LTVAutoRegressive{T,PT<:Union{Array{T,3},Nothing}} <: LinearTimeVaryingModelsBase.LTVModel
+    na::Int
     θ::Array{T,2}
-    Pt::Array{T,3}
+    Pt::PT
     extended::Bool
     ll::Float64
 end
 
-Base.length(m::KalmanAR) = size(m.θ,2)
+Base.length(m::LTVAutoRegressive) = size(m.θ,2)
 
 include("utilities.jl")
 include("peakdetection.jl")

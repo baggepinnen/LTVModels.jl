@@ -1,16 +1,14 @@
 export fit_statespace, fit_statespace_gd, fit_statespace_constrained, fit_statespace_gd!
 using ProximalOperators, SparseArrays, LinearAlgebra, DiffResults
 
-function Lcurve(fun, λs)
-    errors = pmap(fun, λs)
-    plot(λs, errors, xscale=:log10, m=(:cross,))
-    errors, λs
-end
 
-function fit_statespace_gd(x,u,λ; initializer::Symbol=:kalman, extend=false,kwargs...)
-    y,A     = matrices(x,u)
-    n,T     = size(x)
-    m       = size(u,1)
+function fit_statespace_gd(d::AbstractIdData,λ; initializer::Symbol=:kalman, extend=false,kwargs...)
+    @assert hasinput(d) "The identification data must have inputs for this method to apply"
+    model = SimpleLTVModel(d, extend=extend)
+    y,A     = matrices(model,d)
+    T = length(d)
+    n = nstates(d)
+    m = ninputs(d)
     T      -= 1
     if initializer != :kalman
         k = A\y
@@ -21,21 +19,23 @@ function fit_statespace_gd(x,u,λ; initializer::Symbol=:kalman, extend=false,kwa
         R1 = 0.1*eye(n^2+n*m)
         R2 = 10eye(n)
         P0 = 10000R1
-        model = KalmanModel(x,u,R1,R2,P0, extend=false)
+        model = KalmanModel(d,R1,R2,P0, extend=false)
     end
-    fit_statespace_gd!(model, x,u,λ; extend=extend, kwargs...)
+    fit_statespace_gd!(model,d,λ; extend=extend, kwargs...)
 end
 
-function fit_statespace_gd!(model::AbstractModel,x,u,λ; normType = 1, D = 1, step=0.001, iters=10000, lasso=0, decay_rate=0.999, momentum=0.9, print_period = 100, reduction=0, extend=true, opt=LBFGS(m=100), kwargs...)
+function fit_statespace_gd!(model::AbstractModel,d::AbstractIdData,λ; normType = 1, D = 1, step=0.001, iters=10000, lasso=0, decay_rate=0.999, momentum=0.9, print_period = 100, reduction=0, extend=true, opt=LBFGS(m=100), kwargs...)
     if reduction > 0
         decay_rate = decayfun(iters, reduction)
     end
+    T = length(d)
+    n = nstates(d)
+    m = ninputs(d)
+    x = state(d)
     k = model2statevec(model)
-    y, A     = matrices(x,u)
+    y, A     = matrices(model,d)
     nparams = size(A,2)
-    n,T     = size(x)
     T      -= 1
-    m       = size(u,1)
     diff_fun = D == 2 ? x-> diff(diff(x,dims=1),dims=1) : x-> diff(x,dims=1)
     function lossfun(k2)
         loss    = 0.
@@ -68,7 +68,7 @@ function fit_statespace_gd!(model::AbstractModel,x,u,λ; normType = 1, D = 1, st
     # steps       = zeros(iters)
     # # opt         = RMSpropOptimizer(k, step, 0.8, momentum)
     # opt         = ADAMOptimizer(k; α = step,  β1 = 0.9, β2 = 0.999, ɛ = 1e-8)
-    # @progress for iter = 1:iters
+    # for iter = 1:iters
     #     steps[iter] = step
     #     gradient!(all_results, loss_tape, inputs)
     #     costs[iter] = all_results[1].value
@@ -99,10 +99,11 @@ end
 
 
 
-function fit_statespace_constrained(x,u,changepoints::AbstractVector; extend=true)
-    y,A           = matrices(x,u)
-    n,T           = size(x)
-    m             = size(u,1)
+function fit_statespace_constrained(d::AbstractIdData,changepoints::AbstractVector; extend=true)
+    T             = length(d)
+    n             = nstates(d)
+    m             = ninputs(d)
+    y,A           = matrices(SimpleLTVModel(d), d)
     nc            = length(changepoints)
     changepointse = [1; changepoints; T-1]
     Ai            = zeros(n,n,nc+1)
@@ -117,26 +118,8 @@ function fit_statespace_constrained(x,u,changepoints::AbstractVector; extend=tru
     return SimpleLTVModel(At,Bt,extend)
 end
 
-function matrices2(x,u)
-    FT = eltype(x)
-    n,T = size(x)
-    T -= 1
-    m = size(u,1)
-    y = x[:,2:end]
-    A = spzeros(FT,T*n, n^2+n*m)
-    Is = sparse(FT(1.0)I,n,n)
-    for i = 1:T
-        ii = (i-1)*n+1
-        ii2 = ii+n-1
-        A[ii:ii2,1:n^2] = kron(Is,x[:,i]')
-        A[ii:ii2,n^2+1:end] = kron(Is,u[:,i]')
-    end
-    y,A
-end
-
-
 """
-model = fit_statespace_admm(x,u,λ; initializer::Symbol=:kalman)
+model = fit_admm(modeltype::Type, d::AbstractIdData, λ; initializer::Symbol=:kalman)
 
 Fit a model by solving `minimize ||y-ŷ||² + λ²||Dₓ k||` where `x` is 1 or 2
 using linearized ADMM
@@ -146,7 +129,6 @@ See README for usage example
 # Keyword arguments
 iters      = 10000
 D          = 1 # Order of differentiation
-extend     = true
 tol        = 1e-5
 printerval = 100
 zeroinit   = false
@@ -155,48 +137,50 @@ cb         = nothing # Callback function `model -> cb(model)`
 μ          = γ/4/D^2/(ridge == 0 ? 1 : 2), # 32 is the biggest possible ||A||₂² # ADMM parameter
 ridge      = 0 # `ridge > 0` Add some L2 regularization (`||k||`)
 """
-function fit_statespace_admm(x::AbstractArray{FT},u::AbstractArray{FT},λ; initializer::Symbol=:kalman, extend=false, zeroinit = false, kwargs...) where FT
-    y,A     = matrices(x,u)
-    n,T     = size(x)
-    m       = size(u,1)
-    T      -= 1
-    if zeroinit
-        model = SimpleLTVModel(zeros(FT,n,n,T), zeros(FT,n,m,T), false)
-    else
+function fit_admm(model::AbstractModel, d::AbstractIdData,λ; initializer::Symbol=:kalman, zeroinit = false, kwargs...)
+    y,A  = matrices(model, d)
+    T = length(d)
+    n = nstates(d)
+    m = ninputs(d)
+    FT = eltype(y)
+    T -= 1
+    if !zeroinit
         if initializer != :kalman
             k = A\y
             k = repmat(k',T,1)
-            model = statevec2model(k,n,m,false)
+            model = statevec2model(model,k,n,m,false)
         else
             R1 = FT.(0.1*eye(n^2+n*m))
             R2 = FT.(10eye(n))
             P0 = 10000R1
-            model = KalmanModel(x,u,R1,R2,P0, extend=false)
+            model = KalmanModel(model,d,R1,R2,P0, extend=false)
         end
     end
-    fit_statespace_admm!(model, x,u,λ; extend=extend, zeroinit=zeroinit, kwargs...)
+    fit_admm!(model, d,λ; zeroinit=zeroinit, kwargs...)
 end
 
-function fit_statespace_admm!(model::AbstractModel,x::AbstractArray{FT},u::AbstractArray{FT},λ;
+function fit_admm!(model::AbstractModel,d::AbstractIdData,λ;
     iters      = 10000,
     D          = 1,
-    extend     = true,
-    tol        = FT(1e-5),
+    tol        = Float64(1e-5),
     printerval = 100,
     zeroinit   = false,
     cb         = nothing,
-    γ          = FT(0.05),
+    γ          = Float64(0.05),
     ridge      = 0,
-    μ          = FT(γ/4/D^2/(ridge == 0 ? 1 : 2)), # 32 is the biggest possible ||A||₂²
-    kwargs...) where FT
+    μ          = Float64(γ/4/D^2/(ridge == 0 ? 1 : 2)), # 32 is the biggest possible ||A||₂²
+    kwargs...)
 
+    T = length(d)
+    n = nstates(d)
+    m = ninputs(d)
     @show γ, ridge
     k       = LTVModels.model2statevec(model)' |> copy
-    y, Φ    = LTVModels.matrices2(x,u)
+    y, Φ    = matrices(model,d)
     nparams = size(Φ,2)
-    n,T     = size(x)
+    y       = reshape(y,n,:)
+    FT      = eltype(y)
     T      -= 1
-    m       = size(u,1)
     NK      = length(k)
     x       = !zeroinit*copy(k[:])
     A       = sparse(FT(1.0)*I,NK,NK)
@@ -220,16 +204,7 @@ function fit_statespace_admm!(model::AbstractModel,x::AbstractArray{FT},u::Abstr
     end
     @assert 0 ≤ μ ≤ γ/normA2 "μ should be ≤ γ/$normA2"
 
-    fs = ntuple(T) do t
-        ii  = (t-1)*n+1
-        ii2 = ii+n-1
-        a   = Φ[ii:ii2,:]
-        Q   = Matrix(a'a)
-        q   = -a'y[:,t]
-        ProximalOperators.QuadraticIterative(2Q,2q)
-    end
-    indsf = ntuple(t->((t-1)*nparams+1:t*nparams, ), T)
-    proxf = SlicedSeparableSum(fs, indsf)
+    proxf = prox_ls(model, y, Φ)
 
     gs = ntuple(t->NormL2(λ), T-D)
     indsg = ntuple(t->((t-1)*nparams+1:t*nparams, ) ,T-D)
@@ -253,9 +228,9 @@ function fit_statespace_admm!(model::AbstractModel,x::AbstractArray{FT},u::Abstr
     Axzu      = similar(u)
     proxf_arg = similar(x)
     proxg_arg = similar(u)
-    x = _fit_admm_inner(Axzu, Axz,u,μ,γ,A,x,proxf_arg,proxf,z,Ax,proxg,proxg_arg,n,m,T,tol,cb,printerval,iters)
+    x,z = _fit_admm_inner(Axzu, Axz,u,μ,γ,A,x,proxf_arg,proxf,z,Ax,proxg,proxg_arg,n,m,T,tol,cb,printerval,iters)
     k = reshape(x,nparams,T)' |> copy
-    model = LTVModels.statevec2model(k,n,m,true)
+    model = LTVModels.statevec2model(typeof(model),k,n,m,true)
     # plot(flatten(model))
     model
 end
@@ -279,10 +254,8 @@ function _fit_admm_inner(Axzu, Axz,u,μ,γ,A,x,proxf_arg,proxf,z,Ax,proxg,proxg_
         nAxz = norm(Axz)
         if i % printerval == 0
             @printf("%d ||Ax-z||₂ %.6f\n", i,  nAxz)
-            if cb != nothing
-                k = reshape(x,n*(n+m),T)' |> copy
-                model = LTVModels.statevec2model(k,n,m,true)
-                cb(model)
+            if cb !== nothing
+                cb(reshape(x,:,T)' |> copy)
             end
         end
         if nAxz < tol
@@ -290,5 +263,26 @@ function _fit_admm_inner(Axzu, Axz,u,μ,γ,A,x,proxf_arg,proxf,z,Ax,proxg,proxg_
             break
         end
     end
-    x
+    x,z
+end
+
+
+
+function prox_ls(model::SimpleLTVModel, y, Φ)
+    nparams = size(Φ,2)
+    n,T = size(y)
+    fs = ntuple(T) do t
+        ii  = (t-1)*n+1
+        ii2 = ii+n-1
+        a   = Φ[ii:ii2,:]
+        Q   = Matrix(a'a)
+        q   = -a'y[:,t]
+        ProximalOperators.QuadraticIterative(2Q,2q)
+    end
+    indsf = ntuple(t->((t-1)*nparams+1:t*nparams, ), T)
+    proxf = SlicedSeparableSum(fs, indsf)
+end
+
+function prox_ls(model::LTVAutoRegressive, y, Φ)
+    LeastSquares(Φ,y)
 end

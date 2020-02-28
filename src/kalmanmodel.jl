@@ -74,22 +74,30 @@ end
 eye(n) = Matrix{Float64}(I,n,n)
 
 
-function KalmanModel(model::KalmanModel, xi,u,R1,R2, P0=100R1; extend=false, printfit=true)::KalmanModel
+function KalmanModel(model::KalmanModel, d::InputOutputStateData, R1,R2, P0=100R1; extend=false, D=1)::KalmanModel
+    T = length(d)-1
+    n = nstates(d)
+    m = ninputs(d)
+    xi = oftype(Matrix, state(d))
+    u = oftype(Matrix, input(d))
+
     x,u,xnew = xi[:,1:end-1],u[:,1:end-1],xi[:,2:end]
-    n,T = size(x)
     @assert T > n "The calling convention for x and u is that time is the second dimention"
     Ta  = extend ? T+1 : T
-    m   = size(u,1)
     N   = n^2+n*m
     y   = copy(xnew)
-    C   = zeros(n,N,T)
+    C   = zeros(n,D*N,T)
+    if D == 2
+        R1 = kron([1/4 1/2; 1/2 1]+0.001I, R1)
+        P0 = kron([1/4 1/2; 1/2 1]+0.001I, P0)
+    end
     @views for t = 1:T
-        C[:,:,t] = kron(eye(n),[x[:,t]; u[:,t]]')
+        C[:,1:N,t] = kron(eye(n),[x[:,t]; u[:,t]]')
     end
     xkn, Pkn,ll    = kalman_smoother(y, C, R1, R2, P0)
     model.ll = ll
     @views for t = 1:T
-        ABt      = reshape(xkn[:,t],n+m,n)'
+        ABt      = reshape(xkn[1:N,t],n+m,n)'
         model.At[:,:,t] .= ABt[:,1:n]
         model.Bt[:,:,t] .= ABt[:,n+1:end]
     end
@@ -100,18 +108,15 @@ function KalmanModel(model::KalmanModel, xi,u,R1,R2, P0=100R1; extend=false, pri
     end
     model.extended = extend
     model.Pt = Pkn
-    if printfit
-        yhat = predict(model, x,u)
-        fit = nrmse(xnew,yhat)
-        println("Modelfit: ", round.(fit,digits=3))
-    end
 
     return model
 end
 
-function KalmanModel(model::KalmanModel, prior::KalmanModel, X,U,args...; printfit = true, kwargs...)::KalmanModel
-    model = KalmanModel(model, X,U,args...; printfit = false, kwargs...) # Fit model in the standard way without prior
-    n,m,T = size(model.Bt)
+function KalmanModel(model::KalmanModel, prior::KalmanModel, d::AbstractIdData,args...; kwargs...)::KalmanModel
+    model = KalmanModel(model, d,args...; kwargs...) # Fit model in the standard way without prior
+    T = length(d)
+    n = nstates(d)
+    m = ninputs(d)
     # @views model2statevec(model,t) = [vec(model.At[:,:,t]);  vec(model.Bt[:,:,t])][:]
     # @views model2statevec(model,t) = [model.At[:,:,t]  model.Bt[:,:,t]] |> vec
     @views for t = 1:T     # Incorporate prior
@@ -126,77 +131,83 @@ function KalmanModel(model::KalmanModel, prior::KalmanModel, X,U,args...; printf
         model.Bt[:,:,t]  .= ABt[:,n+1:end]
 
     end
-    if printfit
-        yhat = predict(model, X[:,1:end-1],U[:,1:end-1])
-        fit = nrmse(X[:,2:end],yhat)
-        println("Modelfit: ", round.(fit,sigdigits=3))
-    end
     model
 end
 
+# function modelfit(model,d)
+#     x = oftype(Matrix, state(d))
+#     yhat = predict(model, d)
+#     fit = nrmse(x[:,2:end],yhat)
+# end
 
 
-"""
-    KalmanModel(xi, R1, R2, P0=100R1; extend=false, D=1, printfit=true)::KalmanModel
 
-Estimate a Kalman model without control input
+# """
+#     KalmanModel(xi, R1, R2, P0=100R1; extend=false, D=1, printfit=true)::KalmanModel
+#
+# Estimate a Kalman model without control input
+#
+# #Arguments:
+# - `xi`: states or iddata containing states
+# - `R1`: Parameter transition noise
+# - `R2`: State transition noise
+# - `P0`: Initial state cov
+# - `extend`: add one data point at the end to have length of parameter vector match length of input.
+# - `D`: Order of integration of the noise.
+# """
+# function KalmanModel(model::KalmanModel, xi::AnyInput,R1,R2, P0=100R1; extend=false, D=1)::KalmanModel
+#     xi = oftype(Matrix, state(xi))
+#     x,xnew = xi[:,1:end-1],xi[:,2:end]
+#     T = length(d)
+#     n = nstates(d)
+#     m = ninputs(d)
+#     @assert T > n "The calling convention for x and u is that time is the second dimention"
+#     Ta  = extend ? T+1 : T
+#     N   = n^2
+#     y   = copy(xnew)
+#     C   = zeros(n,D*N,T)
+#     if D == 2
+#         R1 = kron([1/4 1/2; 1/2 1]+0.001I, R1)
+#         P0 = kron([1/4 1/2; 1/2 1]+0.001I, P0)
+#     end
+#     @views for t = 1:T
+#         C[:,1:N,t] = kron(eye(n),x[:,t]')
+#     end
+#     xkn, Pkn,ll    = kalman_smoother(y, C, R1, R2, P0)
+#     model.ll = ll
+#     @views for t = 1:T
+#         model.At[:,:,t] .= reshape(xkn[1:N,t],n,n)'
+#     end
+#     @views if extend # Extend model one extra time step (primitive way)
+#         model.At[:,:,end] .= model.At[:,:,end-1]
+#         Pkn = cat(Pkn, Pkn[:,:,end], dims=3)
+#     end
+#     model.extended = extend
+#     model.Pt = Pkn
+#     if printfit
+#         yhat = predict(model, x)
+#         fit = nrmse(xnew,yhat)
+#         println("Modelfit: ", round.(fit,digits=3))
+#     end
+#
+#     return model
+# end
 
-#Arguments:
-- `xi`: states
-- `R1`: Parameter transition noise
-- `R2`: State transition noise
-- `P0`: Initial state cov
-- `extend`: add one data point at the end to have length of parameter vector match length of input.
-- `D`: Order of integration of the noise.
-"""
-function KalmanModel(model::KalmanModel, xi,R1,R2, P0=100R1; extend=false, printfit=true, D=1)::KalmanModel
-    x,xnew = xi[:,1:end-1],xi[:,2:end]
-    n,T = size(x)
-    @assert T > n "The calling convention for x and u is that time is the second dimention"
-    Ta  = extend ? T+1 : T
-    N   = n^2
-    y   = copy(xnew)
-    C   = zeros(n,D*N,T)
-    if D == 2
-        R1 = kron([1/4 1/2; 1/2 1]+0.001I, R1)
-        P0 = kron([1/4 1/2; 1/2 1]+0.001I, P0)
-    end
-    @views for t = 1:T
-        C[:,1:N,t] = kron(eye(n),x[:,t]')
-    end
-    xkn, Pkn,ll    = kalman_smoother(y, C, R1, R2, P0)
-    model.ll = ll
-    @views for t = 1:T
-        model.At[:,:,t] .= reshape(xkn[1:N,t],n,n)'
-    end
-    @views if extend # Extend model one extra time step (primitive way)
-        model.At[:,:,end] .= model.At[:,:,end-1]
-        Pkn = cat(Pkn, Pkn[:,:,end], dims=3)
-    end
-    model.extended = extend
-    model.Pt = Pkn
-    if printfit
-        yhat = predict(model, x)
-        fit = nrmse(xnew,yhat)
-        println("Modelfit: ", round.(fit,digits=3))
-    end
 
-    return model
-end
-
-
-function KalmanAR(model::KalmanAR, yi,R1,R2, P0=100R1; extend=false, printfit=true, D=1)
+function LTVAutoRegressive(model::LTVAutoRegressive, yi,R1,R2, P0=100R1; extend=false, D=1)
+    yi = oftype(Matrix, output(yi))
     y,ynew = yi[1:end-1],yi[2:end]
     T = length(y)
     n = size(R1,1)
-    Ta  = extend ? T+1 : T
     ϕ   = zeros(1,D*n,T)
+    T  = extend ? T : T-1
     if D == 2
         R1 = kron([1/4 1/2; 1/2 1]+0.001I, R1)
         P0 = kron([1/4 1/2; 1/2 1]+0.001I, P0)
     end
     inds = 1:n
     y0 = [zeros(n-1);y]
+    size(y0)
     @views for t = 1:T
         ϕ[1,1:n,t] = y0[inds .+ (t-1)]
     end
@@ -211,18 +222,14 @@ function KalmanAR(model::KalmanAR, yi,R1,R2, P0=100R1; extend=false, printfit=tr
     end
     model.extended = extend
     model.Pt = Pkn
-    if printfit
-        yhat = predict(model, y)
-        fit = nrmse(ynew,yhat)
-        println("Modelfit: ", round.(fit,digits=3))
-    end
 
     return model
 end
 
 
 
-function predict(model::KalmanAR, y)
+function predict(model::LTVAutoRegressive, y)
+    y = output(y)
     T  = length(y)
     n = size(model.θ, 1)
     @assert T<=length(model) "Can not predict further than the number of time steps in the model"

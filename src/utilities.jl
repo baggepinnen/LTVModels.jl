@@ -22,25 +22,33 @@ function getD(D,T)
     error("Can not handle your choice of D: $D")
 end
 
-function matrices(x::AbstractArray{FT},u) where FT
-    n = size(x,1)
-    T = size(x,2)
+function matrices(model::Union{SimpleLTVModel, KalmanModel}, d::AbstractIdData)
+    T = length(d)
     T -= 1
-    m = size(u,1)
+    n = nstates(d)
+    m = ninputs(d)
+    x = oftype(Matrix, state(d))
+    u = oftype(Matrix, input(d))
+    FT = eltype(x)
     A = spzeros(FT, T*n, n^2+n*m)
-    y = zeros(FT, T*n)
     Is = sparse(FT(1.0)*I,n,n)
     for i = 1:T
         ii = (i-1)*n+1
         ii2 = ii+n-1
         A[ii:ii2,1:n^2] = kron(Is,x[:,i]')
         A[ii:ii2,n^2+1:end] = kron(Is,u[:,i]')
-        y[ii:ii2] = (x[:,i+1])
     end
-    y,A
+    vec(x[:,2:end]),A
 end
+
+function matrices(m::LTVAutoRegressive, d::AbstractIdData)
+    y = output(d)
+    getARregressor(y,m.na)
+end
+
 flatten(A) = reshape(A,prod(size(A)[1:2]),size(A,3))'
 flatten(model::LTVStateSpaceModel) = [flatten(model.At) flatten(model.Bt)]
+flatten(model::LTVAutoRegressive) = copy(model.θ')
 decayfun(iters, reduction) = reduction^(1/iters)
 
 function ABfromk(k,n,m,T)
@@ -53,7 +61,7 @@ end
 
 @views model2statevec(model,t) = [model.At[:,:,t]  model.Bt[:,:,t]]' |> vec
 
-function model2statevec(model)
+function model2statevec(model) # dispatch happens in flatten
     k = flatten(model)
     if model.extended
         k = k[1:end-1,:]
@@ -61,9 +69,13 @@ function model2statevec(model)
     k
 end
 
-function statevec2model(k,n,m,extend)
+function statevec2model(::Type{<:LTVStateSpaceModel}, k,n,m,extend)
     At,Bt = ABfromk(k,n,m,size(k,1))
     SimpleLTVModel(At,Bt,extend)
+end
+
+function statevec2model(::Type{<:LTVAutoRegressive}, k,n,m,extend)
+    LTVAutoRegressive(k',nothing,extend,0)
 end
 
 
@@ -131,7 +143,8 @@ function testdata(;T=10000, σ_state_drift=0.001, σ_param_drift=0.001, seed=1, 
         A[:,:,t+1] = A[:,:,t] + σ_param_drift*randn(n,n)
         B[:,:,t+1] = B[:,:,t] + σ_param_drift*randn(n,m)
     end
-    A,B,x,u,n,m,N
+    d = iddata(x,u,x)
+    A,B,d,n,m,N
 end
 
 """
