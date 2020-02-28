@@ -3,9 +3,17 @@
 [![Build Status](https://travis-ci.org/baggepinnen/LTVModels.jl.svg?branch=master)](https://travis-ci.org/baggepinnen/LTVModels.jl)
 [![codecov](https://codecov.io/gh/baggepinnen/LTVModels.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/baggepinnen/LTVModels.jl)
 
+#### What is this package for?
+Estimating linear dynamical models with time-varying parameters (LTV models)
+#### What can LTV models be used for?
+- They can be used to model, simulate and predict the behaviour of time-varying systems.
+- Change-point detection, by estimating specific time points when the dynamics of a signal or system changes.
+- Tell your mother about.
 
+#### Background and references
 This repository implements the system-identification methods presented in  
-[Bagge Carlson, F.](https://www.control.lth.se/staff/fredrik-bagge-carlson/), Robertsson, A. & Johansson, R. ["Identification of LTV Dynamical Models with Smooth or Discontinuous Time Evolution by means of Convex Optimization"](https://arxiv.org/abs/1802.09794) (IEEE ICCA 2018).
+[Bagge Carlson, F.](https://www.control.lth.se/staff/fredrik-bagge-carlson/), Robertsson, A. & Johansson, R. ["Identification of LTV Dynamical Models with Smooth or Discontinuous Time Evolution by means of Convex Optimization"](https://arxiv.org/abs/1802.09794) (IEEE ICCA 2018).  
+And the thesis  
 [Bagge Carlson, F.](https://www.control.lth.se/staff/fredrik-bagge-carlson/), ["Machine Learning and System Identification for Estimation in Physical Systems"](https://lup.lub.lu.se/search/publication/ffb8dc85-ce12-4f75-8f2b-0881e492f6c0) (PhD Thesis 2018).
 ```bibtex
 @thesis{bagge2018,
@@ -31,6 +39,26 @@ using LTVModels
 ```
 
 # Usage
+
+## Overview
+The package implements a number of models and methods to fit them. The models are
+- KalmanModel
+- LTVAutoRegressive
+- SimpleLTVModel
+
+Any model can be instantiated by calling it with an identification-data object and some model-specific parameters, like this
+```julia
+y = randn(100)
+d = iddata(y)
+modelorder = 2
+n  = 6
+R1 = I(modelorder)
+R2 = [1e5] # Increase for more smoothing/regularization
+P0 = 1e4R1
+model = LTVAutoRegressive(d, R1, R2, P0, extend=true)
+```
+
+## Details
 Usage of many of the functions is demonstrated in `tests/runtests.jl`
 
 To fit a model by solving  
