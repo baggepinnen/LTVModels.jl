@@ -42,14 +42,19 @@ gr(size=(400,300))
 T_ = 400
 x,xm,u,n,m = LTVModels.testdata(T_)
 
+d = iddata(x,u,x)
+dm = iddata(xm,u,xm)
+
 anim = Plots.Animation()
-function callback(m)
-    fig = plot(LTVModels.flatten(m.At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", show=true, ylims=(-0.05, 1))
+function callback(k)
+    model = LTVModels.statevec2model(SimpleLTVModel,k,n,m,true)
+    fig = plot(LTVModels.flatten(model.At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", show=true, ylims=(-0.05, 1))
     frame(anim, fig)
 end
 
 λ = 17
-@time model = LTVModels.fit_statespace_admm(xm, u, λ, extend=true,
+model = SimpleLTVModel(dm, extend=true)
+@time model = LTVModels.fit_admm(model, dm, λ, extend=true,
                                                 iters    = 10000,
                                                 D        = 1,
                                                 zeroinit = true,
@@ -57,7 +62,7 @@ end
                                                 ridge    = 0,
                                                 cb       = callback)
 gif(anim, "admm.gif", fps = 10)
-y = predict(model,x,u)
+y = predict(model,d)
 e = x[:,2:end] - y[:,1:end-1]
 println("RMS error: ", LTVModels.rms(e))
 
@@ -78,7 +83,7 @@ The code generates an LTV model `A[t], B[t]` and time series `x,u` governed by t
 ```julia
 using LTVModels, Plots, LinearAlgebra
 T = 2_000
-A,B,x,u,n,m,N = LTVModels.testdata(T=T, σ_state_drift=0.001, σ_param_drift=0.001)
+A,B,d,n,m,N = LTVModels.testdata(T=T, σ_state_drift=0.001, σ_param_drift=0.001)
 
 gr(size=(400,300))
 eye(n) = Matrix{Float64}(I,n,n)
@@ -86,7 +91,7 @@ anim = @animate for r2 = exp10.(range(-3, stop=3, length=10))
     R1          = 0.001*eye(n^2+n*m)
     R2          = r2*eye(n)
     P0          = 10000R1
-    model = KalmanModel(copy(x),copy(u),R1,R2,P0,extend=true, D=1)
+    model = KalmanModel(d,R1,R2,P0,extend=true, D=1)
 
     plot(flatten(A), l=(2,), xlabel="Time index", ylabel="Model coefficients", lab="True", c=:red)
     plot!(flatten(model.At), l=(2,), lab="Estimated", c=:blue, legend=false)
