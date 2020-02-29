@@ -47,20 +47,20 @@ function matrices(m::LTVAutoRegressive, d::AbstractIdData)
     getARregressor([zeros(n-1);vec(y)],m.na)
 end
 
-flatten(A) = reshape(A,prod(size(A)[1:2]),size(A,3))'
-flatten(model::LTVStateSpaceModel) = [flatten(model.At) flatten(model.Bt)]
+flatten(A::AbstractArray{<:Any,3}) = reshape(A,prod(size(A)[1:2]),size(A,3))
+flatten(model::LTVStateSpaceModel) = [flatten(model.At); flatten(model.Bt)]
 flatten(model::LTVAutoRegressive) = model.θ
 decayfun(iters, reduction) = reduction^(1/iters)
 
 function ABfromk(k,n,m,T)
-    At = reshape(k[:,1:n^2]',n,n,T)
-    At = permutedims(At, [2,1,3])
-    Bt = reshape(k[:,n^2+1:end]',m,n,T)
-    Bt = permutedims(Bt, [2,1,3])
+    At = reshape(k[1:n^2,:],n,n,T)
+    # At = permutedims(At, [2,1,3])
+    Bt = reshape(k[n^2+1:end,:],m,n,T)
+    # Bt = permutedims(Bt, [2,1,3])
     At,Bt
 end
 
-@views model2statevec(model,t) = [model.At[:,:,t]  model.Bt[:,:,t]]' |> vec
+@views model2statevec(model,t) = [model.At[:,:,t];  model.Bt[:,:,t]]' |> vec
 
 function model2statevec(model) # dispatch happens in flatten
     k = flatten(model)
@@ -71,11 +71,12 @@ function model2statevec(model) # dispatch happens in flatten
 end
 
 function statevec2model(::Type{<:LTVStateSpaceModel}, k,n,m,extend)
-    At,Bt = ABfromk(k,n,m,size(k,1))
+    At,Bt = ABfromk(k,n,m,size(k,2))
     SimpleLTVModel(At,Bt,extend)
 end
 
 function statevec2model(::Type{<:LTVAutoRegressive}, k,n,m,extend)
+    extend && (k = [k k[:,end]])
     LTVAutoRegressive(size(k,1), copy(k),nothing,extend,0.0)
 end
 

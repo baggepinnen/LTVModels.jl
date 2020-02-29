@@ -140,7 +140,7 @@ eye(n) = Matrix{Float64}(I,n,n)
 
         function callback(k)
             model = LTVModels.statevec2model(SimpleLTVModel,k,n,m,true)
-            @static isinteractive() && plot(flatten(model.At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", show=true)
+            @static isinteractive() && plot(flatten(model.At)', l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", show=true)
         end
 
         d = iddata(x,u,x)
@@ -149,6 +149,7 @@ eye(n) = Matrix{Float64}(I,n,n)
         iters    = 20000,
         D        = 1,
         zeroinit = true,
+        printerval=300,
         tol      = 1e-5,
         ridge    = 0,
         cb       = callback);
@@ -186,7 +187,7 @@ eye(n) = Matrix{Float64}(I,n,n)
 
         act = activation(model)
         changepoints = [findmax(act)[2]]
-        fit_statespace_constrained(dn,changepoints)
+        fit_statespace_constrained(SimpleLTVModel, dn,changepoints)
 
 
         Random.seed!(0)
@@ -260,34 +261,47 @@ end
 
 
 ##
-using ControlSystems
-G1 = tf(1,[1, -0.9, 0.2],1)
-G2 = tf(1,[1, 0.5, 0.1],1)
-T = 500
-sim(sys,u) = lsim(sys, u, 1:T)[1][:]
 
-u1 = randn(T)
-y1 = sim(G1,u1)
+@testset "LTVAutoRegressive admm" begin
+    @info "Testing LTVAutoRegressive admm"
 
-u2 = randn(T)
-y2 = sim(G2,u2)
+    using ControlSystems
+    ζ = 0.1; ω=1
+    G1 = c2d(tf(ω^2,[1, 2ζ*ω, ω^2]), 1)
+    G2 = c2d(tf(2ω^2,[1, 2ζ*ω, 2ω^2]), 1)
 
-y = [y1;y2]
-u = [u1;u2]
+    # G1 = tf(1,[1, -0.9853, 0.8187],1)
+    # G2 = tf(1,[1, -0.9853, 0.8187],1)
+
+    G1 = tf(1,[1, -0.9, 0.2],1)
+    G2 = tf(1,[1, -0.2, 0.2],1)
+    na = length(denvec(G1)[1])-1
+    @assert all(<(1), abs.(pole(G1)))
+    @assert all(<(1), abs.(pole(G2)))
+    T = 500
+    sim(sys,u) = lsim(sys, u, 1:T)[1][:]
+
+    u1 = randn(T)
+    y1 = sim(G1,u1)
+
+    u2 = randn(T)
+    y2 = sim(G2,u2)
+
+    y = [y1;y2] #|> centraldiff
+    u = [u1;u2]
+    @assert all(<(50) ∘ abs, y)
 
 
-d = iddata(y,u)
-##
-function callback(k)
-    # s = size(k)
-    # k = reshape(k', s)
-    @static isinteractive() && plot(k', l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", show=true)
+    d = iddata(y,u)
+
+    function callback(k)
+        @static isinteractive() && plot(k', l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", show=true)
+    end
+    model = LTVAutoRegressive(d,na,extend=true)
+    @time model = LTVModels.fit_admm(model, d,25, iters = 10000, D  = 1, zeroinit = true, tol= 1e-6, ridge = 0, cb=callback, printerval=200, γ=0.02)
+
+    @test model.θ[:,1] ≈ [0.9, -0.2] atol=0.2
+    @test model.θ[:,end] ≈ [0.2, -0.2] atol=0.2
+
+    @time model = LTVModels.fit_admm(model, d,25, iters = 10000, D  = 1, zeroinit = true, tol= 1e-6, ridge = 0, cb=callback, printerval=500, γ=0.01)
 end
-model = LTVAutoRegressive(d,2,extend=true)
-@time model = LTVModels.fit_admm(model, d,10, iters = 1000, D  = 1, zeroinit = false, initializer=:ls, tol= 1e-3, ridge = 0, cb=callback, printerval=50)
-
-
-
-
-##
-LTVModels.model2statevec(model) |> plot
