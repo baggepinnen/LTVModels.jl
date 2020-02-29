@@ -256,3 +256,32 @@ eye(n) = Matrix{Float64}(I,n,n)
 end
 
 end
+
+
+
+##
+using ControlSystems
+G1 = tf(1,[1, -0.9, 0.2],1)
+G2 = tf(1,[1, 0.5, 0.1],1)
+T = 500
+sim(sys,u) = lsim(sys, u, 1:T)[1][:]
+
+u1 = randn(T)
+y1 = sim(G1,u1)
+
+u2 = randn(T)
+y2 = sim(G2,u2)
+
+y = [y1;y2]
+u = [u1;u2]
+
+
+d = iddata(y,u)
+##
+function callback(k)
+    # s = size(k)
+    # k = reshape(k', s)
+    @static isinteractive() && plot(k, l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", show=true)
+end
+model = LTVAutoRegressive(d,2,extend=true)
+@time model = LTVModels.fit_admm(model, d,17, iters = 500, D  = 1, zeroinit = true, tol= 1e-6, ridge = 0, cb=callback);

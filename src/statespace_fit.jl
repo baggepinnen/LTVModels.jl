@@ -172,15 +172,16 @@ function fit_admm!(model::AbstractModel,d::AbstractIdData,λ;
     kwargs...)
 
     T = length(d)
-    n = nstates(d)
+    T -= 1
+    n = noutputs(d)
     m = ninputs(d)
-    @show γ, ridge
-    k       = LTVModels.model2statevec(model)' |> copy
+    γ, ridge
+    k       = LTVModels.model2statevec(model) |> copy
     y, Φ    = matrices(model,d)
     nparams = size(Φ,2)
+    @show n, size(y), size(Φ)
     y       = reshape(y,n,:)
     FT      = eltype(y)
-    T      -= 1
     NK      = length(k)
     x       = !zeroinit*copy(k[:])
     A       = sparse(FT(1.0)*I,NK,NK)
@@ -222,6 +223,7 @@ function fit_admm!(model::AbstractModel,d::AbstractIdData,λ;
     ##
 
     proxg = SlicedSeparableSum(gs, indsg)
+    @show size(A), size(x), size(y), size(Φ)
     Ax        = A*x
     u         = zeros(FT,size(z))
     Axz       = Ax .- z
@@ -255,7 +257,7 @@ function _fit_admm_inner(Axzu, Axz,u,μ,γ,A,x,proxf_arg,proxf,z,Ax,proxg,proxg_
         if i % printerval == 0
             @printf("%d ||Ax-z||₂ %.6f\n", i,  nAxz)
             if cb !== nothing
-                cb(reshape(x,:,T)' |> copy)
+                cb(reshape(x,:,T) |> copy)
             end
         end
         if nAxz < tol
@@ -265,6 +267,7 @@ function _fit_admm_inner(Axzu, Axz,u,μ,γ,A,x,proxf_arg,proxf,z,Ax,proxg,proxg_
     end
     x,z
 end
+
 
 
 
@@ -283,6 +286,40 @@ function prox_ls(model::SimpleLTVModel, y, Φ)
     proxf = SlicedSeparableSum(fs, indsf)
 end
 
+# function prox_ls(model::LTVAutoRegressive, y, Φ)
+#     LeastSquares(Φ,vec(y)) # This prox is not correct
+# end
+
+
+struct ARProx3{AT,YT} <: ProximableFunction
+    ATA::AT
+    Ay::YT
+    na::Int
+end
+
+function ProximalOperators.prox!(o, f::ARProx3, x, γ)
+    # TODO: this can be done vastly more efficiently
+    ATA,Ay = f.ATA, f.Ay
+    # s = 0.
+    na = f.na
+    # @show size(A), size(o)
+    o = reshape(o, na,:)
+    x = reshape(x, na,:)
+    # o = reshape(o, :, na)
+    # x = reshape(x, :, na)
+    for i in 1:size(x,1)
+        @views o[:,i] .= (Ay[i] + 1/γ*x[:,i])./(ATA[i] + 1/γ)
+        # s +-
+    end
+    # s
+end
+
 function prox_ls(model::LTVAutoRegressive, y, Φ)
-    LeastSquares(Φ,y)
+    nparams = size(Φ,2)
+    T = length(y)
+    n = model.na
+    # T -= 1
+    ATA = [a'a for a in eachrow(Φ)]
+    Ay = [Φ[i,:].*y[i] for i in 1:T]
+    ARProx3(ATA,Ay,n)
 end

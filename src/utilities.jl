@@ -43,12 +43,13 @@ end
 
 function matrices(m::LTVAutoRegressive, d::AbstractIdData)
     y = output(d)
-    getARregressor(y,m.na)
+    n = m.na
+    getARregressor([zeros(n-1);y],m.na)
 end
 
 flatten(A) = reshape(A,prod(size(A)[1:2]),size(A,3))'
 flatten(model::LTVStateSpaceModel) = [flatten(model.At) flatten(model.Bt)]
-flatten(model::LTVAutoRegressive) = copy(model.θ')
+flatten(model::LTVAutoRegressive) = model.θ
 decayfun(iters, reduction) = reduction^(1/iters)
 
 function ABfromk(k,n,m,T)
@@ -64,7 +65,7 @@ end
 function model2statevec(model) # dispatch happens in flatten
     k = flatten(model)
     if model.extended
-        k = k[1:end-1,:]
+        k = k[:,1:end-1]
     end
     k
 end
@@ -75,7 +76,7 @@ function statevec2model(::Type{<:LTVStateSpaceModel}, k,n,m,extend)
 end
 
 function statevec2model(::Type{<:LTVAutoRegressive}, k,n,m,extend)
-    LTVAutoRegressive(k',nothing,extend,0)
+    LTVAutoRegressive(size(k,2), copy(k'),nothing,extend,0.0)
 end
 
 
