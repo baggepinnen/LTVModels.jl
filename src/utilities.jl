@@ -44,7 +44,7 @@ end
 function matrices(m::LTVAutoRegressive, d::AbstractIdData)
     y = output(d)
     n = m.na
-    getARregressor([zeros(n-1);y],m.na)
+    getARregressor([zeros(n-1);vec(y)],m.na)
 end
 
 flatten(A) = reshape(A,prod(size(A)[1:2]),size(A,3))'
@@ -76,7 +76,7 @@ function statevec2model(::Type{<:LTVStateSpaceModel}, k,n,m,extend)
 end
 
 function statevec2model(::Type{<:LTVAutoRegressive}, k,n,m,extend)
-    LTVAutoRegressive(size(k,2), copy(k'),nothing,extend,0.0)
+    LTVAutoRegressive(size(k,1), copy(k),nothing,extend,0.0)
 end
 
 

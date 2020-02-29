@@ -281,7 +281,13 @@ d = iddata(y,u)
 function callback(k)
     # s = size(k)
     # k = reshape(k', s)
-    @static isinteractive() && plot(k, l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", show=true)
+    @static isinteractive() && plot(k', l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", show=true)
 end
 model = LTVAutoRegressive(d,2,extend=true)
-@time model = LTVModels.fit_admm(model, d,17, iters = 500, D  = 1, zeroinit = true, tol= 1e-6, ridge = 0, cb=callback);
+@time model = LTVModels.fit_admm(model, d,10, iters = 1000, D  = 1, zeroinit = false, initializer=:ls, tol= 1e-3, ridge = 0, cb=callback, printerval=50)
+
+
+
+
+##
+LTVModels.model2statevec(model) |> plot

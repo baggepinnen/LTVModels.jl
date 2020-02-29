@@ -147,8 +147,8 @@ function fit_admm(model::AbstractModel, d::AbstractIdData,λ; initializer::Symbo
     if !zeroinit
         if initializer != :kalman
             k = A\y
-            k = repmat(k',T,1)
-            model = statevec2model(model,k,n,m,false)
+            k = repeat(k,1,T)
+            model = statevec2model(typeof(model),k,n,m,false)
         else
             R1 = FT.(0.1*eye(n^2+n*m))
             R2 = FT.(10eye(n))
@@ -177,9 +177,10 @@ function fit_admm!(model::AbstractModel,d::AbstractIdData,λ;
     m = ninputs(d)
     γ, ridge
     k       = LTVModels.model2statevec(model) |> copy
+    @assert size(k,1) < size(k,2)
     y, Φ    = matrices(model,d)
+    @assert size(Φ,1) > size(Φ,2)
     nparams = size(Φ,2)
-    @show n, size(y), size(Φ)
     y       = reshape(y,n,:)
     FT      = eltype(y)
     NK      = length(k)
@@ -189,17 +190,17 @@ function fit_admm!(model::AbstractModel,d::AbstractIdData,λ;
         normA2 = ridge > 0 ? 2*3.91 : 3.91
         z       = !zeroinit*diff(k,dims=2)[:]
         for i = 1:NK-nparams
-            A[i, i+nparams] = -1
+            A[i,i+nparams] = -1
         end
         A       = A[1:end-nparams,:]
     elseif D == 2
         normA2 = ridge > 0 ? 2*15.1 : 15.1
         z       = !zeroinit*diff(diff(k,dims=2),dims=2)[:]
         for i = 1:NK-nparams
-            A[i, i+nparams] = -2
+            A[i,i+nparams] = -2
         end
         for i = 1:NK-2nparams
-            A[i, i+2nparams] = 1
+            A[i,i+2nparams] = 1
         end
         A       = A[1:end-2nparams,:]
     end
@@ -207,6 +208,7 @@ function fit_admm!(model::AbstractModel,d::AbstractIdData,λ;
 
     proxf = prox_ls(model, y, Φ)
 
+    @show nparams
     gs = ntuple(t->NormL2(λ), T-D)
     indsg = ntuple(t->((t-1)*nparams+1:t*nparams, ) ,T-D)
 
@@ -226,12 +228,13 @@ function fit_admm!(model::AbstractModel,d::AbstractIdData,λ;
     @show size(A), size(x), size(y), size(Φ)
     Ax        = A*x
     u         = zeros(FT,size(z))
+    @show size(Ax), size(z)
     Axz       = Ax .- z
     Axzu      = similar(u)
     proxf_arg = similar(x)
     proxg_arg = similar(u)
     x,z = _fit_admm_inner(Axzu, Axz,u,μ,γ,A,x,proxf_arg,proxf,z,Ax,proxg,proxg_arg,n,m,T,tol,cb,printerval,iters)
-    k = reshape(x,nparams,T)' |> copy
+    k = reshape(x,nparams,T) |> copy
     model = LTVModels.statevec2model(typeof(model),k,n,m,true)
     # plot(flatten(model))
     model
@@ -252,7 +255,6 @@ function _fit_admm_inner(Axzu, Axz,u,μ,γ,A,x,proxf_arg,proxf,z,Ax,proxg,proxg_
         prox!(z, proxg, proxg_arg, γ)
         Axz .= Ax .- z
         u  .+= Axz
-
         nAxz = norm(Axz)
         if i % printerval == 0
             @printf("%d ||Ax-z||₂ %.6f\n", i,  nAxz)
@@ -307,8 +309,9 @@ function ProximalOperators.prox!(o, f::ARProx3, x, γ)
     x = reshape(x, na,:)
     # o = reshape(o, :, na)
     # x = reshape(x, :, na)
-    for i in 1:size(x,1)
-        @views o[:,i] .= (Ay[i] + 1/γ*x[:,i])./(ATA[i] + 1/γ)
+    γ⁻¹ = (1/γ)
+    @inbounds @simd for i in 1:size(x,2)
+        @views o[:,i] .= (Ay[i] .+ γ⁻¹.*x[:,i])./(ATA[i] + γ⁻¹)
         # s +-
     end
     # s
