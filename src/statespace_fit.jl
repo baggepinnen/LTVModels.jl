@@ -181,6 +181,7 @@ function fit_admm!(model::AbstractModel,d::AbstractIdData,λ;
     if D == 1
         normA2 = ridge > 0 ? 2*3.91 : 3.91
         z       = !zeroinit*diff(k,dims=2)[:]
+        # A = BandedMatrix((0 => Fill(FT(1),NK-D*nparams), nparams => Fill(FT(-1),NK-D*nparams)), (NK-D*nparams,NK)) # This was actually a bit slower
         for i = 1:NK-nparams
             A[i,i+nparams] = -1
         end
@@ -271,8 +272,10 @@ function prox_ls(model::SimpleLTVModel, y, Φ)
         a   = Φ[ii:ii2,:]
         Q   = Matrix(a'a)
         q   = -a'y[:,t]
-        ProximalOperators.QuadraticIterative(2Q,2q)
+        # ProximalOperators.QuadraticIterative(2Q,2q)
+        ProximalOperators.QuadraticDirect(2Q,2q)
     end
+    # @show typeof(fs)
     indsf = ntuple(t->((t-1)*nparams+1:t*nparams, ), T)
     proxf = SlicedSeparableSum(fs, indsf)
 end
