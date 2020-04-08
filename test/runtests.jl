@@ -85,8 +85,8 @@ eye(n) = Matrix{Float64}(I,n,n)
 
                 @test sum(normA) > 4sum(errorA)
                 @static isinteractive() && plot([normA errorA], lab=["normA" "errA"], show=false, layout=2, subplot=1, size=(1500,900))#, yscale=:log10)
-                @static isinteractive() && plot!(flatten(A), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", lab="True",subplot=2, c=:red)
-                @static isinteractive() && plot!(flatten(model.At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", lab="Estimated", subplot=2, c=:blue)
+                @static isinteractive() && plot!(flatten(A)', l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", lab="True",subplot=2, c=:red)
+                @static isinteractive() && plot!(flatten(model.At)', l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", lab="Estimated", subplot=2, c=:blue)
             end
 
         end
@@ -140,7 +140,7 @@ eye(n) = Matrix{Float64}(I,n,n)
 
         function callback(k)
             model = LTVModels.statevec2model(SimpleLTVModel,k,n,m,true)
-            @static isinteractive() && plot(flatten(model.At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", show=true)
+            @static isinteractive() && plot(flatten(model.At)', l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", show=true)
         end
 
         d = iddata(x,u,x)
@@ -149,19 +149,21 @@ eye(n) = Matrix{Float64}(I,n,n)
         iters    = 20000,
         D        = 1,
         zeroinit = true,
-        tol      = 1e-5,
+        printerval=300,
+        tol      = 1e-4,
         ridge    = 0,
         cb       = callback);
         # using ProfileView
         # ProfileView.view()
         # model, cost, steps = fit_statespace_gd!(model,xm,u,100, normType = 1, D = 1, lasso = 1e-8, step=5e-3, momentum=0.99, iters=1000, reduction=0.1, extend=true);
+        #  4.856115 seconds (35.50 M allocations: 2.939 GiB, 10.35% gc time)
         y = predict(model,d);
         e = x[:,2:end] - y[:,1:end-1]
         println("RMS error: ",rms(e))
 
         At,Bt = model.At,model.Bt
         @static isinteractive() && begin
-            plot(flatten(At), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
+            plot(flatten(At)', l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
             plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), l=(:dash,:black, 1))
             plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
             gui()
@@ -172,7 +174,7 @@ eye(n) = Matrix{Float64}(I,n,n)
         # R2          = 10*eye(n)
         # P0          = 10000R1
         # modelk = KalmanModel(x,u,R1,R2,P0,extend=true)
-        # @static isinteractive() && plot!(flatten(modelk.At), l=(2,:auto), lab="Kalman", c=:red)
+        # @static isinteractive() && plot!(flatten(modelk.At)', l=(2,:auto), lab="Kalman", c=:red)
 
         # # savetikz("figs/ss.tex", PyPlot.gcf())#, [" axis lines = middle,enlargelimits = true,"])
         #
@@ -186,7 +188,7 @@ eye(n) = Matrix{Float64}(I,n,n)
 
         act = activation(model)
         changepoints = [findmax(act)[2]]
-        fit_statespace_constrained(dn,changepoints)
+        fit_statespace_constrained(SimpleLTVModel, dn,changepoints)
 
 
         Random.seed!(0)
@@ -202,7 +204,7 @@ eye(n) = Matrix{Float64}(I,n,n)
         At2,Bt2 = model2.At,model2.Bt
         e2 = x[:,2:end] - y2[:,1:end-1]
         println("RMS error: ",rms(e2))
-        @static isinteractive() && plot(flatten(At2), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
+        @static isinteractive() && plot(flatten(At2)', l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
         @static isinteractive() && plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
         @static isinteractive() && plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
 
@@ -212,7 +214,7 @@ eye(n) = Matrix{Float64}(I,n,n)
         At2,Bt2 = model2.At,model2.Bt
         e2 = x[:,2:end] - y2[:,1:end-1]
         println("RMS error: ",rms(e2))
-        @static isinteractive() && plot(flatten(At2), l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
+        @static isinteractive() && plot(flatten(At2)', l=(2,:auto), xlabel="Time index", ylabel="Model coefficients")
         @static isinteractive() && plot!([1,T_÷2-1], [0.95 0.1; 0 0.95][:]'.*ones(2), ylims=(-0.1,1), l=(:dash,:black, 1))
         @static isinteractive() && plot!([T_÷2,T_], [0.5 0.05; 0 0.5][:]'.*ones(2), l=(:dash,:black, 1), grid=false)
 
@@ -255,4 +257,99 @@ eye(n) = Matrix{Float64}(I,n,n)
     LTVModels.benchmark_lin(100, 2, true)
 end
 
+
+
+
+
+##
+
+
+
+end
+
+
+
+@testset "LTVAutoRegressive admm" begin
+    @info "Testing LTVAutoRegressive admm"
+
+    using LTVModels, ControlSystems
+    ζ = 0.1; ω=1
+    G1 = tf(ω^2,[1, 2ζ*ω, ω^2])
+    G2 = G1#tf(ω^2,[1, 0.5*2ζ*ω, 2ω^2])
+    @assert all(<(0), real.(pole(G1)))
+    @assert all(<(0), real.(pole(G2)))
+
+    # G1 = tf(1,[1, -0.9853, 0.8187],1)
+    # G2 = tf(1,[1, -0.9853, 0.8187],1)
+
+    G1 = tf(1,[1, -0.9, 0.2],1)
+    G2 = tf(1,[1, -0.2, 0.2],1)
+    @assert all(<(1), abs.(pole(G1)))
+    @assert all(<(1), abs.(pole(G2)))
+
+    T = 500
+    na = length(denvec(G1)[1])-1
+    sim(sys,u) = lsim(sys, u, 1:T)[1][:]
+
+    u1 = randn(T)
+    y1 = sim(G1,u1)
+
+    u2 = randn(T)
+    y2 = sim(G2,u2)
+
+    y = [y1;y2] #|> centraldiff
+    u = [u1;u2]
+    @assert all(<(50) ∘ abs, y)
+
+
+    d = iddata(y,u)
+
+    # import Base.Iterators: take
+    # import IterTools: iterated
+    # y = output(d)
+    # reduce(hcat, take(iterated(centraldiff,y),na))
+
+    ##
+function callback(k)
+    @static isinteractive() && plot(
+        k',
+        l      = (2, :auto),
+        xlabel = "Time index",
+        ylabel = "Model coefficients",
+        show   = true,
+    )
+end
+model = LTVAutoRegressive(d, na, extend = true)
+@time model = LTVModels.fit_admm( model, d, 20,
+    iters      = 100000,
+    D          = 1,
+    zeroinit   = false,
+    tol        = 1e-7,
+    ridge      = 0,
+    cb         = callback,
+    printerval = 500,
+    γ          = 0.02,
+)
+
+@test model.θ[:, 1] ≈ [0.9, -0.2] atol = 0.2
+@test model.θ[:, end] ≈ [0.2, -0.2] atol = 0.2
+#
+# @time model = LTVModels.fit_admm( model, d, 25,
+#     iters      = 10000,
+#     D          = 1,
+#     zeroinit   = true,
+#     tol        = 1e-6,
+#     ridge      = 0,
+#     cb         = callback,
+#     printerval = 500,
+#     γ          = 0.01,
+# )
+#
+#
+# model = LTVAutoRegressive(d, 3, extend = true)
+# ym, Am = LTVModels.matrices(model, d)
+# @test ym[end] == d.y[end]
+# @test Am[end, 1] == d.y[end-1]
+# @test Am[end, 2] ≈ (d.y[end-1] - d.y[end-2])
+# @test Am[end, 3] ≈ (d.y[end-1] - 2 * d.y[end-2] + d.y[end-3])
 end

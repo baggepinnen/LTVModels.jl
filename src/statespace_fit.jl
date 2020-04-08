@@ -99,11 +99,11 @@ end
 
 
 
-function fit_statespace_constrained(d::AbstractIdData,changepoints::AbstractVector; extend=true)
+function fit_statespace_constrained(modeltype, d::AbstractIdData,changepoints::AbstractVector; extend=true)
     T             = length(d)
     n             = nstates(d)
     m             = ninputs(d)
-    y,A           = matrices(SimpleLTVModel(d), d)
+    y,A           = matrices(modeltype(d), d)
     nc            = length(changepoints)
     changepointse = [1; changepoints; T-1]
     Ai            = zeros(n,n,nc+1)
@@ -115,7 +115,7 @@ function fit_statespace_constrained(d::AbstractIdData,changepoints::AbstractVect
         k = (A[inds,:]\y[inds])'
     end
     At,Bt = segments2full(k,changepoints,n,m,T)
-    return SimpleLTVModel(At,Bt,extend)
+    return modeltype(At,Bt,extend)
 end
 
 """
@@ -137,7 +137,7 @@ cb         = nothing # Callback function `model -> cb(model)`
 μ          = γ/4/D^2/(ridge == 0 ? 1 : 2), # 32 is the biggest possible ||A||₂² # ADMM parameter
 ridge      = 0 # `ridge > 0` Add some L2 regularization (`||k||`)
 """
-function fit_admm(model::AbstractModel, d::AbstractIdData,λ; initializer::Symbol=:kalman, zeroinit = false, kwargs...)
+function fit_admm(model::AbstractModel, d::AbstractIdData,λ; zeroinit = false, kwargs...)
     y,A  = matrices(model, d)
     T = length(d)
     n = nstates(d)
@@ -145,16 +145,10 @@ function fit_admm(model::AbstractModel, d::AbstractIdData,λ; initializer::Symbo
     FT = eltype(y)
     T -= 1
     if !zeroinit
-        if initializer != :kalman
-            k = A\y
-            k = repmat(k',T,1)
-            model = statevec2model(model,k,n,m,false)
-        else
-            R1 = FT.(0.1*eye(n^2+n*m))
-            R2 = FT.(10eye(n))
-            P0 = 10000R1
-            model = KalmanModel(model,d,R1,R2,P0, extend=false)
-        end
+        k = A\y
+        @info "Initial guess: $k"
+        k = repeat(k,1,T)
+        model = statevec2model(typeof(model),k,n,m,false)
     end
     fit_admm!(model, d,λ; zeroinit=zeroinit, kwargs...)
 end
@@ -171,49 +165,49 @@ function fit_admm!(model::AbstractModel,d::AbstractIdData,λ;
     μ          = Float64(γ/4/D^2/(ridge == 0 ? 1 : 2)), # 32 is the biggest possible ||A||₂²
     kwargs...)
 
-    T = length(d)
-    n = nstates(d)
+    T = length(d) - 1
+    n = noutputs(d)
     m = ninputs(d)
-    @show γ, ridge
-    k       = LTVModels.model2statevec(model)' |> copy
+    k       = LTVModels.model2statevec(model) |> copy
+    @assert size(k,1) < size(k,2)
     y, Φ    = matrices(model,d)
+    @assert size(Φ,1) > size(Φ,2)
     nparams = size(Φ,2)
     y       = reshape(y,n,:)
     FT      = eltype(y)
-    T      -= 1
     NK      = length(k)
     x       = !zeroinit*copy(k[:])
-    A       = sparse(FT(1.0)*I,NK,NK)
+    A       = sparse(FT(1.0)*I,NK-D*nparams,NK)
     if D == 1
         normA2 = ridge > 0 ? 2*3.91 : 3.91
         z       = !zeroinit*diff(k,dims=2)[:]
+        # A = BandedMatrix((0 => Fill(FT(1),NK-D*nparams), nparams => Fill(FT(-1),NK-D*nparams)), (NK-D*nparams,NK)) # This was actually a bit slower
         for i = 1:NK-nparams
-            A[i, i+nparams] = -1
+            A[i,i+nparams] = -1
         end
-        A       = A[1:end-nparams,:]
     elseif D == 2
         normA2 = ridge > 0 ? 2*15.1 : 15.1
         z       = !zeroinit*diff(diff(k,dims=2),dims=2)[:]
-        for i = 1:NK-nparams
-            A[i, i+nparams] = -2
-        end
         for i = 1:NK-2nparams
-            A[i, i+2nparams] = 1
+            A[i,i+nparams] = -2
+            A[i,i+2nparams] = 1
         end
-        A       = A[1:end-2nparams,:]
     end
     @assert 0 ≤ μ ≤ γ/normA2 "μ should be ≤ γ/$normA2"
 
+    @show μ
     proxf = prox_ls(model, y, Φ)
 
+    # @show nparams
     gs = ntuple(t->NormL2(λ), T-D)
     indsg = ntuple(t->((t-1)*nparams+1:t*nparams, ) ,T-D)
 
     ## To add extra penalty
     if ridge > 0
-        Q     = sparse(FT(ridge)*I(nparams))
-        q     = zeros(FT,nparams)
-        gs2   = fill(Quadratic(Q,q), T-D)
+        # Q     = sparse(FT(ridge)*I(nparams))
+        # q     = zeros(FT,nparams)
+        # gs2   = fill(Quadratic(Q,q), T-D)
+        gs2 = ntuple(t->SqrNormL2(ridge), T-D)
         gs    = (gs...,gs2...)
         indsg = (indsg..., indsg...)
         A     = [A; A]
@@ -222,14 +216,16 @@ function fit_admm!(model::AbstractModel,d::AbstractIdData,λ;
     ##
 
     proxg = SlicedSeparableSum(gs, indsg)
+    # @show size(A), size(x), size(y), size(Φ)
     Ax        = A*x
     u         = zeros(FT,size(z))
+    # @show size(Ax), size(z)
     Axz       = Ax .- z
     Axzu      = similar(u)
     proxf_arg = similar(x)
     proxg_arg = similar(u)
     x,z = _fit_admm_inner(Axzu, Axz,u,μ,γ,A,x,proxf_arg,proxf,z,Ax,proxg,proxg_arg,n,m,T,tol,cb,printerval,iters)
-    k = reshape(x,nparams,T)' |> copy
+    k = reshape(x,nparams,T) |> copy
     model = LTVModels.statevec2model(typeof(model),k,n,m,true)
     # plot(flatten(model))
     model
@@ -240,22 +236,23 @@ end
 function _fit_admm_inner(Axzu, Axz,u,μ,γ,A,x,proxf_arg,proxf,z,Ax,proxg,proxg_arg,n,m,T,tol,cb,printerval,iters)
     for i = 1:iters
 
-        Axzu .= Axz.+u
-        proxf_arg .= -(μ/γ) .* A'Axzu .+ x # proxf_arg .= x - (μ/γ)*A'*Axzu
+        Axzu .= Axz .+ u
+        mul!(proxf_arg,A',Axzu)
+        proxf_arg .= -(μ/γ) .* proxf_arg .+ x
+        # proxf_arg .= x - (μ/γ)*A'*Axzu
         # proxf_arg .+= x
 
         prox!(x, proxf, proxf_arg, μ)
-        Ax .= A*x # Ax       .= A*x
+        mul!(Ax,A,x) # Ax       .= A*x
         proxg_arg .= Ax .+ u
         prox!(z, proxg, proxg_arg, γ)
         Axz .= Ax .- z
         u  .+= Axz
-
         nAxz = norm(Axz)
         if i % printerval == 0
             @printf("%d ||Ax-z||₂ %.6f\n", i,  nAxz)
             if cb !== nothing
-                cb(reshape(x,:,T)' |> copy)
+                cb(reshape(x,:,T) |> copy)
             end
         end
         if nAxz < tol
@@ -266,8 +263,6 @@ function _fit_admm_inner(Axzu, Axz,u,μ,γ,A,x,proxf_arg,proxf,z,Ax,proxg,proxg_
     x,z
 end
 
-
-
 function prox_ls(model::SimpleLTVModel, y, Φ)
     nparams = size(Φ,2)
     n,T = size(y)
@@ -277,12 +272,42 @@ function prox_ls(model::SimpleLTVModel, y, Φ)
         a   = Φ[ii:ii2,:]
         Q   = Matrix(a'a)
         q   = -a'y[:,t]
-        ProximalOperators.QuadraticIterative(2Q,2q)
+        # ProximalOperators.QuadraticIterative(2Q,2q)
+        ProximalOperators.QuadraticDirect(2Q,2q)
     end
+    # @show typeof(fs)
     indsf = ntuple(t->((t-1)*nparams+1:t*nparams, ), T)
     proxf = SlicedSeparableSum(fs, indsf)
 end
 
+
+
+struct ARProx3{AT,YT} <: ProximableFunction
+    ATA::AT
+    Ay::YT
+    na::Int
+end
+
+function ProximalOperators.prox!(o, f::ARProx3, x, γ)
+    ATA,Ay = f.ATA, f.Ay
+    na = f.na
+    o = reshape(o, na,:)
+    x = reshape(x, na,:)
+    γ⁻¹ = (1/γ)
+    @inbounds @simd for i in 1:size(x,2)
+        @views o[:,i] .= (ATA[i] + γ⁻¹*I)\(Ay[i] .+ γ⁻¹.*x[:,i])
+        # s +-
+    end
+    # s
+end
+
 function prox_ls(model::LTVAutoRegressive, y, Φ)
-    LeastSquares(Φ,y)
+    nparams = size(Φ,2)
+    T = length(y)
+    n = model.na
+    # T -= 1
+    # ATA = [hessenberg(a*a') for a in eachrow(Φ)]
+    ATA = [(a*a') for a in eachrow(Φ)]
+    Ay = [Φ[i,:].*y[i] for i in 1:T]
+    ARProx3(ATA,Ay,n)
 end

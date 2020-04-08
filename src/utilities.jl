@@ -43,39 +43,58 @@ end
 
 function matrices(m::LTVAutoRegressive, d::AbstractIdData)
     y = output(d)
-    getARregressor(y,m.na)
+    n = m.na
+    getARregressor([zeros(n-1);vec(y)],m.na)
+    # NOTE: the code below is an experiment on a continuous time representation of the signals
+    # na = m.na
+    # N = length(y)-1
+    # y = [zeros(na-1); vec(y)]
+    # d = [1,-1]
+    # pol = [1]
+    # ys = map(1:na) do i
+    #     pol = conv(pol,d)
+    #     yc = conv(pol,y)
+    # end
+    # yr = ys[end][end-N+1:end]
+    # A = zeros(N,na)
+    # A[:,1] = y[end-N:end-1]
+    # for c = 2:na
+    #     A[:,c] = ys[c-1][end-N-c+1:end-1-c+1]
+    # end
+    # yr,A
 end
 
-flatten(A) = reshape(A,prod(size(A)[1:2]),size(A,3))'
-flatten(model::LTVStateSpaceModel) = [flatten(model.At) flatten(model.Bt)]
-flatten(model::LTVAutoRegressive) = copy(model.θ')
+flatten(A::AbstractArray{<:Any,3}) = reshape(A,prod(size(A)[1:2]),size(A,3))
+flatten(model::LTVStateSpaceModel) = [flatten(model.At); flatten(model.Bt)]
+flatten(model::LTVAutoRegressive) = model.θ
 decayfun(iters, reduction) = reduction^(1/iters)
 
 function ABfromk(k,n,m,T)
-    At = reshape(k[:,1:n^2]',n,n,T)
-    At = permutedims(At, [2,1,3])
-    Bt = reshape(k[:,n^2+1:end]',m,n,T)
-    Bt = permutedims(Bt, [2,1,3])
+    At = reshape(k[1:n^2,:],n,n,T)
+    # At = permutedims(At, [2,1,3])
+    Bt = reshape(k[n^2+1:end,:],m,n,T)
+    # Bt = permutedims(Bt, [2,1,3])
     At,Bt
 end
 
-@views model2statevec(model,t) = [model.At[:,:,t]  model.Bt[:,:,t]]' |> vec
+@views model2statevec(model,t) = [vec(model.At[:,:,t]);  vec(model.Bt[:,:,t])]
 
 function model2statevec(model) # dispatch happens in flatten
     k = flatten(model)
     if model.extended
-        k = k[1:end-1,:]
+        k = k[:,1:end-1]
     end
     k
 end
 
 function statevec2model(::Type{<:LTVStateSpaceModel}, k,n,m,extend)
-    At,Bt = ABfromk(k,n,m,size(k,1))
+    At,Bt = ABfromk(k,n,m,size(k,2))
     SimpleLTVModel(At,Bt,extend)
 end
 
 function statevec2model(::Type{<:LTVAutoRegressive}, k,n,m,extend)
-    LTVAutoRegressive(k',nothing,extend,0)
+    extend && (k = [k k[:,end]])
+    LTVAutoRegressive(size(k,1), copy(k),nothing,extend,0.0)
 end
 
 
@@ -97,12 +116,12 @@ end
 
 activation(model::LTVStateSpaceModel; kwargs...) = activation(model.At,model.Bt; kwargs...)
 function activation(At,Bt; normalize=false)
-    diffparams = (diff([flatten(At) flatten(Bt)],dims=1)).^2
+    diffparams = (diff([flatten(At); flatten(Bt)],dims=2)).^2
     if normalize
-        diffparams .-= minimum(diffparams,1)
-        diffparams ./= maximum(diffparams,1)
+        diffparams .-= minimum(diffparams,dims=2)
+        diffparams ./= maximum(diffparams,dims=2)
     end
-    activation = sqrt.(sum(diffparams,dims=2)[:])
+    activation = sqrt.(sum(diffparams,dims=1)[:])
     activation
 end
 
