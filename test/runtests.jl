@@ -270,62 +270,86 @@ end
 
 
 @testset "LTVAutoRegressive admm" begin
-@info "Testing LTVAutoRegressive admm"
+    @info "Testing LTVAutoRegressive admm"
 
-using LTVModels, ControlSystems
-ζ = 0.1; ω=1
-G1 = tf(ω^2,[1, 2ζ*ω, ω^2])
-G2 = G1#tf(ω^2,[1, 0.5*2ζ*ω, 2ω^2])
-@assert all(<(0), real.(pole(G1)))
-@assert all(<(0), real.(pole(G2)))
+    using LTVModels, ControlSystems
+    ζ = 0.1; ω=1
+    G1 = tf(ω^2,[1, 2ζ*ω, ω^2])
+    G2 = G1#tf(ω^2,[1, 0.5*2ζ*ω, 2ω^2])
+    @assert all(<(0), real.(pole(G1)))
+    @assert all(<(0), real.(pole(G2)))
 
-# G1 = tf(1,[1, -0.9853, 0.8187],1)
-# G2 = tf(1,[1, -0.9853, 0.8187],1)
+    # G1 = tf(1,[1, -0.9853, 0.8187],1)
+    # G2 = tf(1,[1, -0.9853, 0.8187],1)
 
-G1 = tf(1,[1, -0.9, 0.2],1)
-G2 = tf(1,[1, -0.2, 0.2],1)
-@assert all(<(1), abs.(pole(G1)))
-@assert all(<(1), abs.(pole(G2)))
+    G1 = tf(1,[1, -0.9, 0.2],1)
+    G2 = tf(1,[1, -0.2, 0.2],1)
+    @assert all(<(1), abs.(pole(G1)))
+    @assert all(<(1), abs.(pole(G2)))
 
-T = 500
-na = length(denvec(G1)[1])-1
-sim(sys,u) = lsim(sys, u, 1:T)[1][:]
+    T = 500
+    na = length(denvec(G1)[1])-1
+    sim(sys,u) = lsim(sys, u, 1:T)[1][:]
 
-u1 = randn(T)
-y1 = sim(G1,u1)
+    u1 = randn(T)
+    y1 = sim(G1,u1)
 
-u2 = randn(T)
-y2 = sim(G2,u2)
+    u2 = randn(T)
+    y2 = sim(G2,u2)
 
-y = [y1;y2] #|> centraldiff
-u = [u1;u2]
-@assert all(<(50) ∘ abs, y)
+    y = [y1;y2] #|> centraldiff
+    u = [u1;u2]
+    @assert all(<(50) ∘ abs, y)
 
 
-d = iddata(y,u)
+    d = iddata(y,u)
 
-# import Base.Iterators: take
-# import IterTools: iterated
-# y = output(d)
-# reduce(hcat, take(iterated(centraldiff,y),na))
+    # import Base.Iterators: take
+    # import IterTools: iterated
+    # y = output(d)
+    # reduce(hcat, take(iterated(centraldiff,y),na))
 
-##
+    ##
 function callback(k)
-    @static isinteractive() && plot(k', l=(2,:auto), xlabel="Time index", ylabel="Model coefficients", show=true)
+    @static isinteractive() && plot(
+        k',
+        l      = (2, :auto),
+        xlabel = "Time index",
+        ylabel = "Model coefficients",
+        show   = true,
+    )
 end
-model = LTVAutoRegressive(d,na,extend=true)
-@time model = LTVModels.fit_admm(model, d,20, iters = 100000, D  = 1, zeroinit = false, tol= 1e-7, ridge = 0, cb=callback, printerval=500, γ=0.02)
+model = LTVAutoRegressive(d, na, extend = true)
+@time model = LTVModels.fit_admm( model, d, 20,
+    iters      = 100000,
+    D          = 1,
+    zeroinit   = false,
+    tol        = 1e-7,
+    ridge      = 0,
+    cb         = callback,
+    printerval = 500,
+    γ          = 0.02,
+)
 
-@test model.θ[:,1] ≈ [0.9, -0.2] atol=0.2
-@test model.θ[:,end] ≈ [0.2, -0.2] atol=0.2
+@test model.θ[:, 1] ≈ [0.9, -0.2] atol = 0.2
+@test model.θ[:, end] ≈ [0.2, -0.2] atol = 0.2
 
-@time model = LTVModels.fit_admm(model, d,25, iters = 10000, D  = 1, zeroinit = true, tol= 1e-6, ridge = 0, cb=callback, printerval=500, γ=0.01)
-end
+@time model = LTVModels.fit_admm( model, d, 25,
+    iters      = 10000,
+    D          = 1,
+    zeroinit   = true,
+    tol        = 1e-6,
+    ridge      = 0,
+    cb         = callback,
+    printerval = 500,
+    γ          = 0.01,
+)
 
 
-model = LTVAutoRegressive(d,3,extend=true)
-ym,Am=LTVModels.matrices(model, d)
+model = LTVAutoRegressive(d, 3, extend = true)
+ym, Am = LTVModels.matrices(model, d)
 @test ym[end] == d.y[end]
-@test Am[end,1] == d.y[end-1]
-@test Am[end,2] ≈ (d.y[end-1]-d.y[end-2])
-@test Am[end,3] ≈ (d.y[end-1]-2d.y[end-2]+d.y[end-3])
+@test Am[end, 1] == d.y[end-1]
+@test Am[end, 2] ≈ (d.y[end-1] - d.y[end-2])
+@test Am[end, 3] ≈ (d.y[end-1] - 2 * d.y[end-2] + d.y[end-3])
+end
