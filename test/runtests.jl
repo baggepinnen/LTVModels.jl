@@ -333,23 +333,23 @@ model = LTVAutoRegressive(d, na, extend = true)
 
 @test model.θ[:, 1] ≈ [0.9, -0.2] atol = 0.2
 @test model.θ[:, end] ≈ [0.2, -0.2] atol = 0.2
-
-@time model = LTVModels.fit_admm( model, d, 25,
-    iters      = 10000,
-    D          = 1,
-    zeroinit   = true,
-    tol        = 1e-6,
-    ridge      = 0,
-    cb         = callback,
-    printerval = 500,
-    γ          = 0.01,
-)
-
-
-model = LTVAutoRegressive(d, 3, extend = true)
-ym, Am = LTVModels.matrices(model, d)
-@test ym[end] == d.y[end]
-@test Am[end, 1] == d.y[end-1]
-@test Am[end, 2] ≈ (d.y[end-1] - d.y[end-2])
-@test Am[end, 3] ≈ (d.y[end-1] - 2 * d.y[end-2] + d.y[end-3])
+#
+# @time model = LTVModels.fit_admm( model, d, 25,
+#     iters      = 10000,
+#     D          = 1,
+#     zeroinit   = true,
+#     tol        = 1e-6,
+#     ridge      = 0,
+#     cb         = callback,
+#     printerval = 500,
+#     γ          = 0.01,
+# )
+#
+#
+# model = LTVAutoRegressive(d, 3, extend = true)
+# ym, Am = LTVModels.matrices(model, d)
+# @test ym[end] == d.y[end]
+# @test Am[end, 1] == d.y[end-1]
+# @test Am[end, 2] ≈ (d.y[end-1] - d.y[end-2])
+# @test Am[end, 3] ≈ (d.y[end-1] - 2 * d.y[end-2] + d.y[end-3])
 end
