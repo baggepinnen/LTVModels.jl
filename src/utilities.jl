@@ -77,7 +77,7 @@ function ABfromk(k,n,m,T)
     At,Bt
 end
 
-@views model2statevec(model,t) = [model.At[:,:,t];  model.Bt[:,:,t]]' |> vec
+@views model2statevec(model,t) = [vec(model.At[:,:,t]);  vec(model.Bt[:,:,t])]
 
 function model2statevec(model) # dispatch happens in flatten
     k = flatten(model)
@@ -116,12 +116,12 @@ end
 
 activation(model::LTVStateSpaceModel; kwargs...) = activation(model.At,model.Bt; kwargs...)
 function activation(At,Bt; normalize=false)
-    diffparams = (diff([flatten(At) flatten(Bt)],dims=1)).^2
+    diffparams = (diff([flatten(At); flatten(Bt)],dims=2)).^2
     if normalize
-        diffparams .-= minimum(diffparams,1)
-        diffparams ./= maximum(diffparams,1)
+        diffparams .-= minimum(diffparams,dims=2)
+        diffparams ./= maximum(diffparams,dims=2)
     end
-    activation = sqrt.(sum(diffparams,dims=2)[:])
+    activation = sqrt.(sum(diffparams,dims=1)[:])
     activation
 end
 
