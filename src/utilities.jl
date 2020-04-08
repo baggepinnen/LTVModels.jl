@@ -43,8 +43,22 @@ end
 
 function matrices(m::LTVAutoRegressive, d::AbstractIdData)
     y = output(d)
-    n = m.na
-    getARregressor([zeros(n-1);vec(y)],m.na)
+    na = m.na
+    N = length(y)-1
+    y = [zeros(na-1); vec(y)]
+    d = [1,-1]
+    pol = [1]
+    ys = map(1:na) do i
+        pol = conv(pol,d)
+        yc = conv(pol,y)
+    end
+    yr = ys[end][end-N+1:end]
+    A = zeros(N,na)
+    A[:,1] = y[end-N:end-1]
+    for c = 2:na
+        A[:,c] = ys[c-1][end-N-c+1:end-1-c+1]
+    end
+    yr,A
 end
 
 flatten(A::AbstractArray{<:Any,3}) = reshape(A,prod(size(A)[1:2]),size(A,3))
