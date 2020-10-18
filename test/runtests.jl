@@ -1,5 +1,8 @@
+@info "using LTVModels"
 using LTVModels
+@info "using Test, LinearAlgebra, Statistics, Random"
 using Test, LinearAlgebra, Statistics, Random
+@info "using Plots, Optim"
 using Plots, Optim
 
 eye(n) = Matrix{Float64}(I,n,n)

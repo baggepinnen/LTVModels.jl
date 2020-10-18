@@ -1,6 +1,6 @@
 # LTVModels
 
-[![Build Status](https://travis-ci.org/baggepinnen/LTVModels.jl.svg?branch=master)](https://travis-ci.org/baggepinnen/LTVModels.jl)
+[![CI](https://github.com/baggepinnen/LTVModels.jl/workflows/CI/badge.svg)](https://github.com/baggepinnen/LTVModels.jl/actions)
 [![codecov](https://codecov.io/gh/baggepinnen/LTVModels.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/baggepinnen/LTVModels.jl)
 
 #### What is this package for?
