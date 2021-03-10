@@ -134,6 +134,7 @@ end
 model = fit_statespace_dp(x,u, M; extend=true)
 
 Fit model using dynamic programming. `M` is the number of changepoints.
+´x` and `u` should have time in the second dimension.
 
 See Bagge Carlson et al. 2018 section IID
 Usage example in function `benchmark_ss`
@@ -141,7 +142,10 @@ Usage example in function `benchmark_ss`
 function fit_statespace_dp(x,u, M; extend=true, kwargs...)
     n,T = size(x)
     m = size(u,1)
-    input = matrices(x,u)
+    d = iddata(x[:,2:end],u, x[:,1:end-1])
+    input = matrices(SimpleLTVModel(d), d)
+    @show size.(input)
+    # input = matrices(x,u)
     V,bps,a = seg_bellman(input,M, ones(T-1), cost_ss, argmin_ss, doplot=false)
     At,Bt = segments2full(a,bps,n,m,T)
 

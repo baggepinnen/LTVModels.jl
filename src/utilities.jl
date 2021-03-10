@@ -43,7 +43,7 @@ end
 
 function matrices(m::LTVAutoRegressive, d::AbstractIdData)
     y = output(d)
-    getARregressor(y,m.na)
+    getARregressor(vec(y),m.na)
 end
 
 flatten(A) = reshape(A,prod(size(A)[1:2]),size(A,3))'
