@@ -1,7 +1,7 @@
 name = "LTVModels"
 uuid = "3abffc1c-5106-53b7-b354-a47bfc086ccc"
 authors = ["baggepinnen <baggepinnen@gmail.com>"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 ControlSystemIdentification = "3abffc1c-5106-53b7-b354-a47bfc086282"
